@@ -1,0 +1,11 @@
+/* Persistent presentation keeps the original Space, people and real player
+   together after X has unmounted its React popup. */
+.ss-persistent-space .ss-dock-native-link { display:inline-flex;align-items:center;justify-content:center;width:27px;height:28px;color:#e5d9f1;text-decoration:none;border-radius:9px;font-size:18px; }
+.ss-persistent-space .ss-dock-native-link:hover { background:#ffffff12; }
+.ss-persistent-space .ss-dock-people-label { color:#b8adc7;font:500 9px/1.3 system-ui;margin:2px 0 3px;text-align:left; }
+.ss-persistent-space .ss-person-avatar { display:flex;align-items:center;justify-content:center;overflow:hidden;background:#bd93f918;color:#d5b6fd;text-decoration:none;font:500 12px/1 system-ui; }
+.ss-persistent-space .ss-person-name { color:#f2eaff;text-decoration:none; }
+.ss-persistent-space .ss-person-name:hover { text-decoration:underline; }
+.ss-persistent-space .ss-dock-open { display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box; }
+.ss-persistent-space .ss-dock-close { font-size:21px; }
+.ss-persistent-space .ss-dock-share { font-size:17px; }
