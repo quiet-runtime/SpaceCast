@@ -34,7 +34,7 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
     createPanel(space) { return { space, element: { isConnected: false }, dispose() {} }; },
     openSpaceSession(value) { calls.opened.push(value.space.id); },
   });
-  vm.runInContext('let spaceSession; let dismissedSpacePath="";let nativeOwnedSpaceId="";let nativeLeavePending=false;\n' + navigation + '\nglobalThis.api={reconcileSpace,requestSpaceClose,setSession(v){spaceSession=v},getSession(){return spaceSession}};', context);
+  vm.runInContext('let spaceSession; let dismissedSpacePath="";let nativeOwnedSpaceId="";let nativeOwnedSpacePath="";let nativeOwnedWasActive=false;let nativeLeavePending=false;\n' + navigation + '\nglobalThis.api={reconcileSpace,requestSpaceClose,setSession(v){spaceSession=v},getSession(){return spaceSession}};', context);
   context.api.setSession(session);
   return { context, calls, panel, sheet, session, engine, location, native(value) { native = value; } };
 }
@@ -191,6 +191,51 @@ test('dock native-control navigation waits for recording finalization', () => {
   state.panel.pendingClose();
   assert.equal(navigated, true);
   assert.equal(state.calls.close, 1);
+});
+
+test('native automatic end allows a later same-Space preview without autoplay in the current one', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.native({ isConnected: true });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  state.panel.pendingClose();
+  state.context.nativeListeningActive = () => true;
+  state.context.api.reconcileSpace();
+  state.context.nativeListeningActive = () => false;
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, []);
+  state.location.pathname = '/home';
+  state.context.api.reconcileSpace();
+  state.location.pathname = '/i/spaces/spaceOne/peek';
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, ['spaceOne']);
+});
+
+test('failed native Join releases ownership when navigating away and reopening the same Space', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  state.panel.pendingClose();
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, []);
+  state.location.pathname = '/home';
+  state.context.api.reconcileSpace();
+  state.location.pathname = '/i/spaces/spaceOne/peek';
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, ['spaceOne']);
+});
+
+test('active native listening stays exclusive while navigating and reopening Manage Space', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  state.panel.pendingClose();
+  state.context.nativeListeningActive = () => true;
+  for (const route of ['/home', '/explore', '/i/spaces/spaceOne/peek']) {
+    state.location.pathname = route;
+    state.native({ isConnected: true });
+    state.context.api.reconcileSpace();
+  }
+  assert.deepEqual(state.calls.opened, []);
+  assert.equal(state.calls.dock, 0);
 });
 
 const sheetSelectorSource = source.slice(source.indexOf('function nativeSpaceSheet()'), source.indexOf('function nativeListeningActive()'));
