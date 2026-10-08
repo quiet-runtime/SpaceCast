@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Graphics · SpaceCast 1.0.0</title>
+  <link rel="stylesheet" href="../css/spacecast.css">
+  <link rel="stylesheet" href="../css/appearance.css">
+  <link rel="stylesheet" href="../css/options.css">
+  <script src="../js/AppearanceSettings.js" defer></script>
+  <script src="../js/GlassAppearance.js" defer></script>
+  <script src="../js/options.js" defer></script>
+</head>
+<body class="settings-page">
+  <main class="settings-shell">
+    <header class="settings-header">
+      <div class="settings-brand"><img class="spacecast-logo" src="../icon/spacecast-prism.png" width="32" height="32" alt="">SpaceCast</div>
+      <span class="settings-version">1.0.0 · Graphics</span>
+    </header>
+    <div class="settings-intro"><p class="eyebrow">GRAPHICS &amp; APPEARANCE</p><h1>Your Space, your style.</h1><p>Tune your Space window. Changes appear instantly in open Spaces.</p></div>
+    <div class="settings-layout">
+      <form id="appearance-form" class="settings-controls">
+        <fieldset id="settings-fields" disabled>
+          <legend class="sr-only">Space window appearance</legend>
+          <section class="settings-section">
+            <div class="section-heading"><h2>Surface</h2><span>Four ways to see your Space</span></div>
+            <div class="style-grid">
+              <label class="style-choice"><input type="radio" name="style" id="style-liquid" value="liquid"><span class="style-swatch liquid-swatch"></span><strong>Liquid glass</strong><small>Light, depth, refraction</small></label>
+              <label class="style-choice"><input type="radio" name="style" id="style-dracula" value="dracula"><span class="style-swatch dracula-swatch"></span><strong>Dracula</strong><small>Soft violet glass</small></label>
+              <label class="style-choice"><input type="radio" name="style" id="style-oled" value="oled"><span class="style-swatch oled-swatch"></span><strong>OLED</strong><small>Deep black, quiet edges</small></label>
+              <label class="style-choice"><input type="radio" name="style" id="style-solid" value="solid"><span class="style-swatch solid-swatch"></span><strong>Solid</strong><small>Clean and lightweight</small></label>
+            </div>
+          </section>
+          <section class="settings-section slider-section">
+            <div class="setting-range"><label for="opacity">Surface opacity <output for="opacity" id="opacity-value">45%</output></label><input id="opacity" type="range" min="20" max="90" step="1" value="45"><div class="range-ends"><span>More transparent</span><span>More opaque</span></div></div>
+            <div class="setting-range"><label for="blur">Background blur <output for="blur" id="blur-value">16 px</output></label><input id="blur" type="range" min="0" max="30" step="1" value="16"><div class="range-ends"><span>Sharper</span><span>Softer</span></div></div>
+            <div class="setting-range"><label for="refraction">Glass refraction <output for="refraction" id="refraction-value">18</output></label><input id="refraction" type="range" min="0" max="40" step="1" value="18"><div class="range-ends"><span>Subtle</span><span>Sculpted</span></div></div>
+            <p id="surface-note" class="setting-note">Refraction bends the background near the glass edges.</p>
+          </section>
+          <section class="settings-section">
+            <div class="section-heading"><h2>Comfort</h2><span>Keep everything readable</span></div>
+            <div class="select-setting"><label for="participants">Participant size</label><select id="participants"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large</option></select></div>
+            <label class="toggle-setting" for="spectrum"><span><strong>Audio spectrum</strong><small>Show the live audio visualizer</small></span><input id="spectrum" type="checkbox" role="switch" checked></label>
+            <label class="toggle-setting" for="reducedMotion"><span><strong>Reduce motion</strong><small>Freeze the spectrum and decorative motion</small></span><input id="reducedMotion" type="checkbox" role="switch"></label>
+          </section>
+          <div class="settings-actions"><button type="button" id="reset">Reset to defaults</button><p id="save-status" role="status" aria-live="polite">Loading your settings…</p></div>
+        </fieldset>
+      </form>
+      <aside class="preview-column" aria-label="Live appearance preview">
+        <div class="preview-heading"><span class="eyebrow">LIVE PREVIEW</span><span id="preview-style-name">Liquid glass</span></div>
+        <div class="preview-stage">
+          <div class="preview-scene" aria-hidden="true"><div class="scene-orb orb-one"></div><div class="scene-orb orb-two"></div><div class="scene-grid"></div><div class="scene-note">Ideas worth<br>staying for.</div><div class="scene-copy">Listening. Thinking. Exploring.</div><div class="scene-stripes"></div></div>
+          <div id="appearance-preview" class="ss-sheet preview-window" aria-label="Sample Space window">
+            <div class="preview-titlebar"><span class="preview-grip" aria-hidden="true">⠿</span><strong>Late night, bright ideas</strong><span class="preview-live">LIVE</span><span aria-hidden="true">− &nbsp; ×</span></div>
+            <div id="spacecast-panel" class="preview-player">
+              <div class="ss-visualizer preview-spectrum" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="preview-progress" aria-hidden="true"><span></span></div><div class="preview-times"><span>12:48</span><span>LIVE AUDIO</span></div>
+              <div class="preview-transport" aria-hidden="true"><span>↶</span><span class="preview-play">Ⅱ</span><span>↷</span><span class="preview-live-dot">● Live</span><span class="preview-volume">◖ ━━━</span></div>
+              <div class="preview-tools"><span>⌁ Equalizer</span><span class="preview-record">● Record audio</span></div>
+            </div>
+            <div class="preview-people ss-people">
+              <div class="ss-person"><span class="ss-avatar avatar-one">AL</span><span class="preview-person-copy"><strong class="ss-person-name">Alex</strong><span class="ss-person-role">Host</span></span></div>
+              <div class="ss-person"><span class="ss-avatar avatar-two">SA</span><span class="preview-person-copy"><strong class="ss-person-name">Sam</strong><span class="ss-person-role">Speaker</span></span></div>
+              <div class="ss-person"><span class="ss-avatar avatar-three">JO</span><span class="preview-person-copy"><strong class="ss-person-name">Jordan</strong><span class="ss-person-role">Speaker</span></span></div>
+            </div>
+            <div class="preview-bottom"><span>42 listeners</span><span>Listen anonymously <b aria-hidden="true"></b></span></div>
+          </div>
+        </div>
+        <p class="preview-caption">A sample Space over a patterned page. Your background supplies the glass effect.</p>
+        <div class="settings-tip"><span aria-hidden="true">↔</span><p>Drag the title to move your whole Space. Drag an edge or corner to resize; double-click the corner to fit.</p></div>
+      </aside>
+    </div>
+    <footer class="settings-footer">Saved on this browser. No account or external service needed.</footer>
+  </main>
+</body>
+</html>
