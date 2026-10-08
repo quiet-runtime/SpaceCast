@@ -1,0 +1,26 @@
+# Generated browser bundles and dependencies
+/build/
+/dist/
+/node_modules/
+
+# Local configuration, recordings, and development artifacts
+.env
+.env.*
+!.env.example
+*.log
+*.tap
+*.zip
+*.opus
+*.aac
+*.mp4
+*.webm
+*.bak
+/work/
+/outputs/
+/local-history/
+/history/
+/backups/
+/test-profile*/
+.DS_Store
+Thumbs.db
+

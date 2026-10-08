@@ -1,0 +1,62 @@
+{
+  "action": {
+    "default_popup": "html/popup.html",
+    "default_title": "SpaceCast",
+    "default_icon": {
+      "16": "icon/spacecast-prism.png",
+      "24": "icon/spacecast-prism.png",
+      "32": "icon/spacecast-prism.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "js/SpaceCastApi.js",
+        "js/hls.js/hls.min.js",
+        "js/LiveCache.js",
+        "js/OggOpus.js",
+        "js/Visualizer.js",
+        "js/Equalizer.js",
+        "js/ScreenRecorder.js",
+        "js/PlayerControls.js",
+        "js/AppearanceSettings.js",
+        "js/GlassAppearance.js",
+        "js/GlassWindow.js",
+        "js/SpaceSheet.js",
+        "js/SpaceDock.js",
+        "js/SpaceCast.js"
+      ],
+      "matches": [
+        "https://twitter.com/*",
+        "https://x.com/*"
+      ],
+      "css": [
+        "css/spacecast.css",
+        "css/appearance.css",
+        "css/persistence.css"
+      ]
+    }
+  ],
+  "description": "Continuous X Spaces audio with live rewind and recording.",
+  "icons": {
+    "16": "icon/spacecast-prism.png",
+    "48": "icon/spacecast-prism.png",
+    "128": "icon/spacecast-prism.png"
+  },
+  "manifest_version": 3,
+  "web_accessible_resources": [
+    {
+      "resources": ["icon/spacecast-prism.png"],
+      "matches": ["https://x.com/*", "https://twitter.com/*"]
+    }
+  ],
+  "options_ui": {
+    "page": "html/options.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "storage"
+  ],
+  "name": "SpaceCast",
+  "version": "1.0.0"
+}

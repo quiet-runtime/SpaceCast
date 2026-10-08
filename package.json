@@ -1,0 +1,15 @@
+{
+  "name": "spacecast",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Continuous X Spaces audio with live rewind and recording.",
+  "license": "MIT",
+  "author": "Quiet Runtime (https://github.com/quiet-runtime)",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tools/test-*.cjs",
+    "check": "node tools/check-release.mjs",
+    "build:firefox": "node tools/build-firefox.mjs",
+    "build:chrome": "node tools/build-chrome.mjs"
+  }
+}
