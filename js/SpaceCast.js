@@ -1543,6 +1543,8 @@ let spaceSession = null;
 let reconcileQueued = false;
 let dismissedSpacePath = "";
 let nativeOwnedSpaceId = "";
+let nativeOwnedSpacePath = "";
+let nativeOwnedWasActive = false;
 let nativeLeavePending = false;
 
 // Cache startup can wait on IndexedDB, which does not accept an AbortSignal.
@@ -1670,7 +1672,12 @@ function requestSpaceClose(session, { native = false, hide = false, suppress = t
   if (!session || spaceSession !== session || session.closing) return;
   session.closing = true;
   if (suppress) dismissedSpacePath = location.pathname;
-  if (native) { nativeOwnedSpaceId = session.space.id; nativeLeavePending = false; }
+  if (native) {
+    nativeOwnedSpaceId = session.space.id;
+    nativeOwnedSpacePath = location.pathname;
+    nativeOwnedWasActive = nativeListeningActive();
+    nativeLeavePending = false;
+  }
   session.controller.abort();
   clearTimeout(session.recoveryTimer);
   session.panel.audio.muted = true;
@@ -1722,17 +1729,25 @@ function restoreNativePresentation(session) {
 
 function reconcileSpace() {
   const match = /^\/i\/spaces\/([A-Za-z0-9_-]+)(\/peek)?(?:\/|$)/.exec(location.pathname);
-  if (nativeLeavePending && !nativeListeningActive()) {
-    nativeLeavePending = false;
-    nativeOwnedSpaceId = "";
-    dismissedSpacePath = location.pathname;
+  if (spaceSession?.closing) return;
+  const nativeActive = nativeListeningActive();
+  if (nativeOwnedSpaceId) {
+    if (nativeActive) nativeOwnedWasActive = true;
+    else if (nativeLeavePending || nativeOwnedWasActive || nativeOwnedSpacePath !== location.pathname) {
+      // Ending/disconnecting native audio must not permanently blacklist a Space.
+      // If it ends in an open preview, wait for an explicit reopen before autoplay.
+      if (nativeLeavePending || nativeOwnedWasActive) dismissedSpacePath = location.pathname;
+      nativeOwnedSpaceId = "";
+      nativeOwnedSpacePath = "";
+      nativeOwnedWasActive = false;
+      nativeLeavePending = false;
+    }
   }
   if (dismissedSpacePath && dismissedSpacePath !== location.pathname) dismissedSpacePath = "";
   // A join can return to the background article instead of a Space URL.
   // Native ownership therefore follows user intent and X's controls, not URL alone.
   const nativeMode = new URLSearchParams(location.search).get("spacecast") === "native";
-  if (spaceSession?.closing) return;
-  if (spaceSession && (nativeListeningActive() || nativeMode || (match && !match[2] && match[1] === spaceSession.space.id))) {
+  if (spaceSession && (nativeActive || nativeMode || (match && !match[2] && match[1] === spaceSession.space.id))) {
     requestSpaceClose(spaceSession, { native: true, hide: true });
     return;
   }
@@ -1751,7 +1766,7 @@ function reconcileSpace() {
     spaceSession.panel.refreshShell();
   }
   if (!match || spaceSession || !match[2]) return;
-  if (nativeMode || nativeListeningActive() || nativeOwnedSpaceId === match[1]) return;
+  if (nativeMode || nativeActive || nativeOwnedSpaceId === match[1]) return;
   if (dismissedSpacePath === location.pathname) return;
   // The preview often appears before its sheet. Full native Space routes never
   // start a second player, and unrelated dialogs are never adopted.
