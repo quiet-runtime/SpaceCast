@@ -63,8 +63,8 @@ class SpaceDock {
       try { await navigator.clipboard.writeText(this.spaceUrl()); share.title = "Space link copied"; }
       catch { share.title = "Could not copy the Space link"; }
     });
-    const nativeLink = this.link("Open native Space controls in a new tab", this.spaceUrl(true), "ss-dock-native-link");
-    nativeLink.textContent = "⋯";
+    const nativeLink = this.button("Open native Space controls", "\u22ef", "ss-dock-native-link");
+    this.handoffControl(nativeLink, options);
     right.append(share, nativeLink);
     toolbar.append(left, right);
     const heading = this.node("div", "ss-native-heading");
@@ -107,9 +107,9 @@ class SpaceDock {
       details.append(listeners);
     }
     const footer = this.node("div", "ss-native-footer");
-    footer.append(this.node("p", "ss-notice", "Keep browsing X — this Space keeps playing. Native listening controls open in a new tab."));
-    const open = this.link("Open Space controls in a new tab", this.spaceUrl(true), "ss-native-listen ss-dock-open");
-    open.textContent = "Open Space controls ↗";
+    footer.append(this.node("p", "ss-notice", "Keep browsing X — this Space keeps playing. Opening native controls stops this player."));
+    const open = this.button("Open Space controls", "Open Space controls \u2197", "ss-native-listen ss-dock-open");
+    this.handoffControl(open, options);
     footer.append(open);
     details.append(footer);
     body.append(toolbar, heading, panel.element, details, grip);
@@ -147,6 +147,10 @@ class SpaceDock {
     link.title = label;
     link.setAttribute("aria-label", label);
     return link;
+  }
+
+  handoffControl(button, options) {
+    this.listen(button, "click", () => options.onOpenControls?.(this.spaceUrl(true)));
   }
 
   listen(target, type, handler) {

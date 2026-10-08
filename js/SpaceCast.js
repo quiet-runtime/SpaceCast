@@ -1028,6 +1028,10 @@ function createPanel(space) {
   let shellCleanup = () => {};
   let shellRefresh = () => {};
   let closeWhenIdle = null;
+  let closeRequested = false;
+  audio.addEventListener("play", () => {
+    if (closeRequested) { audio.muted = true; audio.pause(); }
+  });
 
   // Reuse the current capture stream and MediaRecorder if its presentation
   // moves to a new native sheet. Merely browsing never stops a recording.
@@ -1316,13 +1320,17 @@ function createPanel(space) {
       this.nativeSheet = null;
       this.dock = null;
     },
-    wantsPlayback() { return !audio.paused || (!panel.isConnected && playbackWasRunning); },
+    wantsPlayback() { return !closeRequested && (!audio.paused || (!panel.isConnected && playbackWasRunning)); },
     resumeAfterMove(playing) {
-      if (playing && audio.paused) audio.play().catch(() => {});
+      if (!closeRequested && playing && audio.paused) audio.play().catch(() => {});
       refreshCaptureTarget();
     },
     requestClose(callback) {
-      if (closeWhenIdle) return;
+      if (closeRequested) return;
+      closeRequested = true;
+      playbackWasRunning = false;
+      audio.muted = true;
+      audio.pause();
       closeWhenIdle = callback;
       if (recorder?.state === "recording") recorder.requestStop();
       if (video.state === "recording") video.stop();
@@ -1367,7 +1375,15 @@ function applySpaceAppearance(element, panel) {
 }
 
 function nativeSpaceSheet() {
-  return document.querySelector('div[data-testid="sheetDialog"]:not([data-ss-persistent])');
+  // Other X dialogs use sheetDialog too; only adopt a Space preview.
+  return [...document.querySelectorAll('div[data-testid="sheetDialog"]:not([data-ss-persistent])')].find(sheet =>
+    sheet.classList.contains("ss-sheet") || (sheet.querySelector('[data-testid="tweetText"]') &&
+      sheet.querySelector('[data-testid^="UserAvatar-Container-"], button[aria-label="Start listening"]'))
+  ) || null;
+}
+
+function nativeListeningActive() {
+  return !!document.querySelector('[aria-label="Manage Space"]');
 }
 
 function mountPanel(panel, isPeek) {
@@ -1466,18 +1482,26 @@ function mountPanel(panel, isPeek) {
       if (closing) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      panel.requestClose(() => {
+      requestSpaceClose(spaceSession, { onClosed: () => {
         closing = true;
         anchor.click();
-        if (spaceSession?.panel === panel) closeSpaceSession();
-      });
+      } });
+    };
+    // Stop our player before X starts native audio, regardless of its next URL.
+    const join = event => {
+      const target = event.target?.closest?.(".ss-native-listen");
+      if (target && sheet.contains(target) && !panel.element.contains(target)) {
+        requestSpaceClose(spaceSession, { native: true, hide: true });
+      }
     };
     anchor?.addEventListener("click", close, true);
+    sheet.addEventListener("click", join, true);
     panel.setShellCleanup(() => {
       clearTimeout(escapeTurn);
       panel.nativeDismissal = false;
       document.removeEventListener("keydown", rememberEscape, true);
       anchor?.removeEventListener("click", close, true);
+      sheet.removeEventListener("click", join, true);
       disposeAppearance();
       glass.dispose();
       shell.dispose();
@@ -1500,10 +1524,12 @@ function mountSpaceDock(panel, options = {}) {
   const dock = new SpaceDock(panel, panel.spaceSnapshot || SpaceDock.snapshot(null, panel.space), {
     ...options,
     appearance: applySpaceAppearance,
-    onClose: () => panel.requestClose(() => {
-      dismissedSpacePath = location.pathname;
-      if (spaceSession?.panel === panel) closeSpaceSession();
-    }),
+    onClose: () => { if (spaceSession?.panel === panel) requestSpaceClose(spaceSession); },
+    onOpenControls: url => {
+      if (spaceSession?.panel === panel) requestSpaceClose(spaceSession, {
+        native: true, onClosed: () => location.assign(url),
+      });
+    },
   });
   panel.dock = dock;
   panel.setShellRefresh(() => dock.refresh());
@@ -1511,11 +1537,13 @@ function mountSpaceDock(panel, options = {}) {
 }
 
 // One owner per route. Old requests cannot attach audio to a new Space.
-// The owner outlives ordinary X routes; only explicit Close or another Space
-// ends it. React owns the native popup, never the cache or recording session.
+// The owner outlives ordinary X routes. Close, native listening, or another
+// Space ends it. React owns the native popup, never the cache or recording session.
 let spaceSession = null;
 let reconcileQueued = false;
 let dismissedSpacePath = "";
+let nativeOwnedSpaceId = "";
+let nativeLeavePending = false;
 
 // Cache startup can wait on IndexedDB, which does not accept an AbortSignal.
 // Race every startup stage against cancellation so a hung store cannot strand UI.
@@ -1541,7 +1569,7 @@ function closeSpaceSession() {
 
 async function openSpaceSession(session) {
   const { space, panel, controller } = session;
-  const current = () => spaceSession === session && !controller.signal.aborted;
+  const current = () => spaceSession === session && !session.closing && !controller.signal.aborted;
   let stage = "Space details";
   let timedOut = false;
   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
@@ -1615,7 +1643,7 @@ async function openSpaceSession(session) {
     hls.attachMedia(panel.audio);
     hls.loadSource(url);
   } catch (error) {
-    if (spaceSession !== session) return;
+    if (spaceSession !== session || session.closing) return;
     controller.abort();
     clearTimeout(session.recoveryTimer);
     session.cache?.destroy();
@@ -1625,7 +1653,7 @@ async function openSpaceSession(session) {
     console.warn("[SpaceCast] Could not open Space " + space.id + ": " + message);
     panel.setError(message);
     panel.setRetry(() => {
-      if (spaceSession !== session) return;
+      if (spaceSession !== session || session.closing) return;
       session.controller = new AbortController();
       session.cache = null;
       session.hls = null;
@@ -1636,6 +1664,28 @@ async function openSpaceSession(session) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function requestSpaceClose(session, { native = false, hide = false, suppress = true, onClosed } = {}) {
+  if (!session || spaceSession !== session || session.closing) return;
+  session.closing = true;
+  if (suppress) dismissedSpacePath = location.pathname;
+  if (native) { nativeOwnedSpaceId = session.space.id; nativeLeavePending = false; }
+  session.controller.abort();
+  clearTimeout(session.recoveryTimer);
+  session.panel.audio.muted = true;
+  session.panel.audio.pause();
+  if (hide) {
+    session.panel.element.style.display = "none";
+    if (session.panel.dock) session.panel.dock.root.style.display = "none";
+  }
+  // Audio/video recording owns its own input. Let final encoding and saving
+  // finish, but never keep audible playback or recreate a closing window.
+  session.panel.requestClose(() => {
+    if (spaceSession !== session) return;
+    closeSpaceSession();
+    onClosed?.();
+  });
 }
 
 function preserveSpacePresentation(session, force = false) {
@@ -1671,46 +1721,46 @@ function restoreNativePresentation(session) {
 }
 
 function reconcileSpace() {
-  // Owned native-control links open a separate tab without a second autoplaying
-  // extension player. The original tab and its capture session stay untouched.
-  if (!spaceSession && new URLSearchParams(location.search).get("spacecast") === "native") return;
   const match = /^\/i\/spaces\/([A-Za-z0-9_-]+)(\/peek)?(?:\/|$)/.exec(location.pathname);
+  if (nativeLeavePending && !nativeListeningActive()) {
+    nativeLeavePending = false;
+    nativeOwnedSpaceId = "";
+    dismissedSpacePath = location.pathname;
+  }
   if (dismissedSpacePath && dismissedSpacePath !== location.pathname) dismissedSpacePath = "";
+  // A join can return to the background article instead of a Space URL.
+  // Native ownership therefore follows user intent and X's controls, not URL alone.
+  const nativeMode = new URLSearchParams(location.search).get("spacecast") === "native";
+  if (spaceSession?.closing) return;
+  if (spaceSession && (nativeListeningActive() || nativeMode || (match && !match[2] && match[1] === spaceSession.space.id))) {
+    requestSpaceClose(spaceSession, { native: true, hide: true });
+    return;
+  }
   if (spaceSession?.panel.nativeDismissal && !spaceSession.panel.nativeSheet?.isConnected) {
-    const previous = spaceSession;
-    preserveSpacePresentation(previous);
-    previous.panel.requestClose(() => {
-      if (spaceSession !== previous) return;
-      dismissedSpacePath = location.pathname;
-      closeSpaceSession();
-    });
+    requestSpaceClose(spaceSession, { hide: true });
     return;
   }
   if (spaceSession && match && spaceSession.space.id !== match[1]) {
     const previous = spaceSession;
-    preserveSpacePresentation(previous, true);
-    previous.panel.requestClose(() => {
-      if (spaceSession !== previous) return;
-      closeSpaceSession();
-      reconcileSpace();
-    });
+    requestSpaceClose(previous, { suppress: false, hide: true, onClosed: reconcileSpace });
     return;
   }
   if (spaceSession) {
-    if (match?.[2] && match[1] === spaceSession.space.id && nativeSpaceSheet()) restoreNativePresentation(spaceSession);
+    if (match && match[1] === spaceSession.space.id && nativeSpaceSheet()) restoreNativePresentation(spaceSession);
     if (!spaceSession.panel.element.isConnected) preserveSpacePresentation(spaceSession);
     spaceSession.panel.refreshShell();
   }
-  if (!match || spaceSession) return;
+  if (!match || spaceSession || !match[2]) return;
+  if (nativeMode || nativeListeningActive() || nativeOwnedSpaceId === match[1]) return;
   if (dismissedSpacePath === location.pathname) return;
-  // A peek route often appears before its sheet. Avoid constructing WebAudio
-  // and codec probes on every unrelated DOM mutation while waiting for it.
-  if (match[2] && !nativeSpaceSheet()) return;
+  // The preview often appears before its sheet. Full native Space routes never
+  // start a second player, and unrelated dialogs are never adopted.
+  if (!nativeSpaceSheet()) return;
   let panel;
   try {
     const space = { id: match[1], url: "https://x.com/i/spaces/" + match[1], title: "", host: "", state: "" };
     panel = createPanel(space);
-    if (!mountPanel(panel, match[2] != null)) { panel.dispose(); return; }
+    if (!mountPanel(panel, true)) { panel.dispose(); return; }
     const session = spaceSession = { space, panel, controller: new AbortController(), cache: null, hls: null };
     void openSpaceSession(session);
   } catch (error) {
@@ -1718,6 +1768,18 @@ function reconcileSpace() {
     console.warn("[SpaceCast] Player setup failed: " + (error.message || error));
   }
 }
+
+// Leaving native listening explicitly permits a later preview to own playback.
+// Suppress the current route until that preview is actually reopened.
+document.addEventListener("click", event => {
+  if (!nativeOwnedSpaceId) return;
+  const target = event.target?.closest?.('button, [role="button"]');
+  if (!target || !nativeListeningActive()) return;
+  const label = (target.getAttribute("aria-label") || target.textContent || "").trim();
+  if (label !== "Leave") return;
+  nativeLeavePending = true;
+  queueMicrotask(reconcileSpace);
+}, true);
 
 new MutationObserver(() => {
   if (reconcileQueued) return;
