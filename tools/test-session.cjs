@@ -131,3 +131,22 @@ test('route close cancels a hung cache without updating the disposed panel', asy
   assert.equal(state.retries.length, 0);
   assert.equal(state.timers.size, 0);
 });
+
+
+test('a closing session ignores manifest playback, retry and recovery callbacks while recordings save', async () => {
+  const state = setup();
+  await state.api.openSpaceSession(state.session);
+  for (let count = 0; count < 4; count++) state.hls.emit('error', { fatal: true, details: 'buffer', type: 'media' });
+  const retry = state.retries.at(-1);
+  state.session.closing = true;
+  const errors = state.errors.length;
+  const retries = state.retries.length;
+  state.hls.emit('parsed');
+  state.hls.emit('buffered');
+  state.hls.emit('error', { fatal: true, details: 'late', type: 'media' });
+  retry();
+  assert.equal(state.played, 0);
+  assert.equal(state.errors.length, errors);
+  assert.equal(state.retries.length, retries);
+  assert.equal(state.timers.size, 0);
+});

@@ -4,13 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../js/SpaceCast.js'), 'utf8');
-const navigation = source.slice(source.indexOf('function preserveSpacePresentation('), source.indexOf('new MutationObserver(() => {', source.indexOf('function reconcileSpace()')));
+const navigation = source.slice(source.indexOf('function requestSpaceClose('), source.indexOf('new MutationObserver(() => {', source.indexOf('function reconcileSpace()')));
 
 function setup({ connected = false, route = '/explore', paused = false, docked = false } = {}) {
-  const calls = { dock: 0, native: 0, release: 0, close: 0, opened: [], resumed: [], refresh: 0 };
+  const calls = { pause: 0, dock: 0, native: 0, release: 0, close: 0, opened: [], resumed: [], refresh: 0 };
   const sheet = { isConnected: connected, style: { left: '45px', top: '75px' }, dataset: { minimized: 'false' } };
   const panel = {
-    space: { id: 'spaceOne', title: 'Original Space' }, element: { isConnected: connected },
+    space: { id: 'spaceOne', title: 'Original Space' }, element: { isConnected: connected, style: {} },
+    audio: { muted: false, pause() { calls.pause++; } },
     nativeSheet: sheet, spaceSnapshot: { title: 'Original Space', people: [] }, nativeDismissal: false,
     wantsPlayback() { return !paused; }, resumeAfterMove(value) { calls.resumed.push(value); },
     releaseShell() { calls.release++; this.nativeSheet = null; this.dock = null; },
@@ -18,12 +19,13 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
     dispose() {},
   };
   const engine = { hls: {}, cache: {} };
-  const session = { space: panel.space, panel, ...engine };
-  if (docked) panel.dock = { refresh() { panel.element.isConnected = true; } };
+  const session = { space: panel.space, panel, controller: new AbortController(), ...engine };
+  if (docked) panel.dock = { root: { style: {} }, refresh() { panel.element.isConnected = true; } };
   const location = { pathname: route, search: '' };
   let native = null;
   const context = vm.createContext({
-    URLSearchParams, AbortController, location, console: { warn() {} },
+    URLSearchParams, AbortController, location, clearTimeout() {}, queueMicrotask() {}, console: { warn() {} },
+    document: { addEventListener() {} }, nativeListeningActive() { return false; },
     SpaceDock: { snapshot(_sheet, _space, prior) { return prior; } },
     nativeSpaceSheet() { return native; },
     mountSpaceDock(target, options) { calls.dock++; calls.dockOptions = options; target.element.isConnected = true; target.dock = { refresh() { target.element.isConnected = true; } }; },
@@ -32,7 +34,7 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
     createPanel(space) { return { space, element: { isConnected: false }, dispose() {} }; },
     openSpaceSession(value) { calls.opened.push(value.space.id); },
   });
-  vm.runInContext('let spaceSession; let dismissedSpacePath="";\n' + navigation + '\nglobalThis.api={reconcileSpace,setSession(v){spaceSession=v},getSession(){return spaceSession}};', context);
+  vm.runInContext('let spaceSession; let dismissedSpacePath="";let nativeOwnedSpaceId="";let nativeLeavePending=false;\n' + navigation + '\nglobalThis.api={reconcileSpace,requestSpaceClose,setSession(v){spaceSession=v},getSession(){return spaceSession}};', context);
   context.api.setSession(session);
   return { context, calls, panel, sheet, session, engine, location, native(value) { native = value; } };
 }
@@ -73,8 +75,9 @@ test('another Space waits for the old save before opening a new session', () => 
   const state = setup({ connected: true, route: '/i/spaces/spaceTwo/peek' });
   state.native({ isConnected: true });
   state.context.api.reconcileSpace();
-  assert.equal(state.calls.dock, 1);
-  assert.equal(state.calls.dockOptions.root, null, 'never reuse a still-mounted React root');
+  assert.equal(state.calls.dock, 0);
+  assert.equal(state.panel.element.style.display, 'none');
+  assert.equal(state.calls.pause, 1);
   assert.equal(state.calls.close, 0);
   assert.deepEqual(state.calls.opened, []);
   state.panel.pendingClose();
@@ -98,18 +101,19 @@ test('a removed owned dock is reattached rather than rebuilding the session', ()
   assert.equal(state.calls.release, 0);
 });
 
-test('Escape unmount requests a safe save while ordinary unmount continues playback', () => {
+test('Escape unmount requests a safe save without constructing a second window', () => {
   const state = setup();
   state.panel.nativeDismissal = true;
   state.context.api.reconcileSpace();
-  assert.equal(state.calls.dock, 1);
+  assert.equal(state.calls.dock, 0);
+  assert.equal(state.calls.pause, 1);
   assert.equal(typeof state.panel.pendingClose, 'function');
   assert.equal(state.calls.close, 0);
   state.panel.pendingClose();
   assert.equal(state.calls.close, 1);
 });
 
-test('native-controls new tab never starts a second extension session', () => {
+test('native-controls handoff route never starts a second extension session', () => {
   const state = setup({ route: '/i/spaces/spaceOne/peek' });
   state.context.api.setSession(null);
   state.location.search = '?spacecast=native';
@@ -117,6 +121,88 @@ test('native-controls new tab never starts a second extension session', () => {
   state.context.api.reconcileSpace();
   assert.deepEqual(state.calls.opened, []);
   assert.equal(state.calls.native, 0);
+});
+
+test('entering the native full route pauses immediately and never creates a background dock', () => {
+  const state = setup({ connected: false, route: '/i/spaces/spaceOne' });
+  state.context.api.reconcileSpace();
+  assert.equal(state.session.closing, true);
+  assert.equal(state.panel.audio.muted, true);
+  assert.equal(state.calls.pause, 1);
+  assert.equal(state.calls.dock, 0);
+  state.context.api.reconcileSpace();
+  assert.equal(state.calls.pause, 1);
+  state.panel.pendingClose();
+  state.context.api.reconcileSpace();
+  assert.equal(state.calls.close, 1);
+  assert.deepEqual(state.calls.opened, []);
+});
+
+test('native join stays terminal across a background route and Manage Space reopening', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  state.location.pathname = '/someone/status/article';
+  state.context.api.reconcileSpace();
+  assert.equal(state.calls.dock, 0);
+  assert.equal(state.calls.pause, 1);
+  state.panel.pendingClose();
+  state.location.pathname = '/i/spaces/spaceOne/peek';
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, []);
+});
+
+test('native Close suppresses late mutations on the unchanged preview route', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session);
+  state.context.api.reconcileSpace();
+  state.panel.pendingClose();
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  assert.equal(state.calls.close, 1);
+  assert.deepEqual(state.calls.opened, []);
+});
+
+test('fresh full native routes never start extension audio', () => {
+  const state = setup({ route: '/i/spaces/spaceOne' });
+  state.context.api.setSession(null);
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  assert.deepEqual(state.calls.opened, []);
+  assert.equal(state.calls.dock, 0);
+});
+
+test('native listening indicator hands off even while the page stays on a background route', () => {
+  const state = setup({ connected: true });
+  state.context.nativeListeningActive = () => true;
+  state.context.api.reconcileSpace();
+  assert.equal(state.session.closing, true);
+  assert.equal(state.calls.pause, 1);
+  assert.equal(state.calls.dock, 0);
+});
+
+test('dock native-control navigation waits for recording finalization', () => {
+  const state = setup({ docked: true, connected: true });
+  let navigated = false;
+  state.context.api.requestSpaceClose(state.session, { native: true, onClosed() { navigated = true; } });
+  assert.equal(navigated, false);
+  assert.equal(state.calls.pause, 1);
+  state.context.api.reconcileSpace();
+  state.panel.pendingClose();
+  assert.equal(navigated, true);
+  assert.equal(state.calls.close, 1);
+});
+
+const sheetSelectorSource = source.slice(source.indexOf('function nativeSpaceSheet()'), source.indexOf('function nativeListeningActive()'));
+test('unrelated sheets are ignored while a delayed-participant Space preview is recognized', () => {
+  const generic = { classList: { contains: () => false }, querySelector: () => null };
+  const preview = { classList: { contains: () => false }, querySelector: selector => selector.includes('tweetText') || selector.includes('Start listening') ? {} : null };
+  const sheets = [generic, preview];
+  const context = vm.createContext({ document: { querySelectorAll: () => sheets } });
+  vm.runInContext(sheetSelectorSource + '\nglobalThis.pick = nativeSpaceSheet;', context);
+  assert.equal(context.pick(), preview);
+  sheets.pop();
+  assert.equal(context.pick(), null);
 });
 
 const dockContext = vm.createContext({ URL });
