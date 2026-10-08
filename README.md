@@ -58,7 +58,7 @@ Open a live or recorded Space on X. SpaceCast adds its player to the Space windo
 
 The move grip and resize corner also work with the keyboard: arrow keys adjust by 10 pixels, or 50 with Shift. Home resets position on the move grip or automatic sizing on the resize corner.
 
-Browsing within X keeps the current session running. When X removes its own Space popup, SpaceCast retains the player and a **People · last seen** snapshot. Use **Open Space controls** to reach X's native controls in a separate tab.
+Browsing within X keeps the current session running. When X removes its own Space popup, SpaceCast retains the player and a **People · last seen** snapshot. Use **Open Space controls** to stop the extension player, finish saving any recording, and open X's controls in the same tab. **Start listening** hands playback to X and removes the extension player. Closing either extension presentation stops its audio; it does not leave another player behind.
 
 ## What to expect
 
