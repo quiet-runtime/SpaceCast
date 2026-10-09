@@ -8,7 +8,7 @@ SpaceCast gives X Spaces a movable, resizable player with continuous live rewind
 
 > **Coming next:** The official SpaceCast release on the Chrome Web Store. Until then, install the unpacked extension using the steps below.
 
-**[Download for Chrome / Edge](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.3/SpaceCast-1.0.3-chrome.zip)** · [All downloads and release notes](https://github.com/quiet-runtime/SpaceCast/releases/latest)
+**[Download for Chrome / Edge](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.4/SpaceCast-1.0.4-chrome.zip)** · [All downloads and release notes](https://github.com/quiet-runtime/SpaceCast/releases/latest)
 
 ## A closer look
 
@@ -35,7 +35,7 @@ SpaceCast gives X Spaces a movable, resizable player with continuous live rewind
 
 ### Chrome or Edge
 
-1. [Download the Chrome / Edge ZIP](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.3/SpaceCast-1.0.3-chrome.zip) and extract it into a folder you will keep.
+1. [Download the Chrome / Edge ZIP](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.4/SpaceCast-1.0.4-chrome.zip) and extract it into a folder you will keep.
 2. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge.
 3. Enable **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
 4. Refresh any open X tabs, then open a Space on [x.com](https://x.com).
@@ -44,7 +44,7 @@ To update, replace the files in that same folder, click **Reload** on the extens
 
 ### Firefox — development build
 
-[Download the unsigned Firefox development ZIP](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.3/SpaceCast-1.0.3-firefox-development.zip) and extract it, or build it from the source folder:
+[Download the unsigned Firefox development ZIP](https://github.com/quiet-runtime/SpaceCast/releases/download/v1.0.4/SpaceCast-1.0.4-firefox-development.zip) and extract it, or build it from the source folder:
 
 ```sh
 npm run build:firefox
