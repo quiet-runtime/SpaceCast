@@ -1369,10 +1369,12 @@ function applySpaceAppearance(element, panel) {
   const update = event => panel.visualizer.setDisplayOptions(event.detail);
   element.addEventListener("spacecast:appearancechange", update);
   const appearance = new SpaceGlassAppearance(element);
-  return () => {
+  const dispose = () => {
     element.removeEventListener("spacecast:appearancechange", update);
     appearance.dispose();
   };
+  dispose.ready = appearance.ready;
+  return dispose;
 }
 
 function nativeSpaceSheet() {
@@ -1391,10 +1393,11 @@ function mountPanel(panel, isPeek, windowState = {}) {
   if (isPeek) {
     const sheet = nativeSpaceSheet();
     if (!sheet) return false;
+    globalThis.SpaceCastPresentation?.prepare(sheet);
     panel.nativeSheet = sheet;
     const layout = new SpacePreviewLayout(sheet, panel.element);
     const { body, heading, closeButton: anchor } = layout;
-    if (!body) { layout.dispose(); return false; }
+    if (!body) { layout.dispose(); globalThis.SpaceCastPresentation?.release(sheet); return false; }
     const grip = document.createElement("button");
     grip.type = "button";
     grip.className = "ss-sheet-grip";
@@ -1413,12 +1416,22 @@ function mountPanel(panel, isPeek, windowState = {}) {
     let escapeTurn = null;
     const rememberEscape = event => {
       if (event.key !== "Escape" || shell.hasOtherModal()) return;
+      const otherMenu = [...document.querySelectorAll('[role="menu"], [role="listbox"]')].some(menu =>
+        !menu.contains(sheet) && menu.getClientRects().length && getComputedStyle(menu).visibility !== "hidden");
+      if (otherMenu) return;
       panel.nativeDismissal = true;
       clearTimeout(escapeTurn);
-      // Observe intent only for this native event turn. Escape can dismiss a
-      // menu without closing the Space; in that case nothing is stopped.
-      escapeTurn = setTimeout(() => { panel.nativeDismissal = false; }, 0);
+      // X can unmount after an exit animation. Keep recent dismissal intent
+      // through that delay; other open menus were excluded above.
+      escapeTurn = setTimeout(() => { panel.nativeDismissal = false; }, 1200);
     };
+    const cancelEscape = event => {
+      if (!event.isTrusted || (event.type === "keydown" && event.key === "Escape")) return;
+      clearTimeout(escapeTurn);
+      panel.nativeDismissal = false;
+    };
+    document.addEventListener("pointerdown", cancelEscape, true);
+    document.addEventListener("keydown", cancelEscape, true);
     document.addEventListener("keydown", rememberEscape, true);
     const close = event => {
       if (closing) return;
@@ -1443,6 +1456,8 @@ function mountPanel(panel, isPeek, windowState = {}) {
       clearTimeout(escapeTurn);
       panel.nativeDismissal = false;
       document.removeEventListener("keydown", rememberEscape, true);
+      document.removeEventListener("pointerdown", cancelEscape, true);
+      document.removeEventListener("keydown", cancelEscape, true);
       anchor?.removeEventListener("click", close, true);
       sheet.removeEventListener("click", join, true);
       disposeAppearance();
@@ -1465,6 +1480,9 @@ function mountPanel(panel, isPeek, windowState = {}) {
       panel.resumeAfterMove(playing);
     });
     panel.spaceSnapshot = SpaceDock.snapshot(sheet, panel.space, panel.spaceSnapshot);
+    globalThis.SpaceCastPresentation?.ready(sheet, disposeAppearance.ready.then(() => {
+      if (panel.nativeSheet === sheet && sheet.isConnected) glass.clampPosition();
+    }));
     return true;
   }
   mountSpaceDock(panel);
@@ -1636,6 +1654,8 @@ function requestSpaceClose(session, { native = false, hide = false, suppress = t
   session.panel.audio.muted = true;
   session.panel.audio.pause();
   if (hide) {
+    const sheet = session.panel.nativeSheet;
+    if (sheet?.contains?.(session.panel.element)) globalThis.SpaceCastPresentation?.dismiss(sheet);
     session.panel.element.style.display = "none";
     if (session.panel.dock) session.panel.dock.root.style.display = "none";
   }
@@ -1643,6 +1663,10 @@ function requestSpaceClose(session, { native = false, hide = false, suppress = t
   // finish, but never keep audible playback or recreate a closing window.
   session.panel.requestClose(() => {
     if (spaceSession !== session) return;
+    // React may keep the native DOM alive during its exit animation. Hide the
+    // owned window before disposing its theme, without touching a reused sheet.
+    const sheet = session.panel.nativeSheet;
+    if (sheet?.contains?.(session.panel.element)) globalThis.SpaceCastPresentation?.dismiss(sheet);
     closeSpaceSession();
     onClosed?.();
   });
@@ -1719,8 +1743,10 @@ function reconcileSpace() {
     spaceSession.panel.refreshShell();
   }
   if (!match || spaceSession || !match[2]) return;
-  if (nativeMode || nativeOwnedSpaceId === match[1]) return;
-  if (dismissedSpacePath === location.pathname) return;
+  if (nativeMode || nativeOwnedSpaceId === match[1] || dismissedSpacePath === location.pathname) {
+    globalThis.SpaceCastPresentation?.release(nativeSpaceSheet());
+    return;
+  }
   // The preview often appears before its sheet. Full native Space routes never
   // start a second player, and unrelated dialogs are never adopted.
   if (!nativeSpaceSheet()) return;
@@ -1737,6 +1763,7 @@ function reconcileSpace() {
     void openSpaceSession(session);
   } catch (error) {
     panel?.dispose();
+    globalThis.SpaceCastPresentation?.release(nativeSpaceSheet());
     console.warn("[SpaceCast] Player setup failed: " + (error.message || error));
   }
 }
@@ -1761,6 +1788,7 @@ new MutationObserver(() => {
   childList: true, subtree: true, characterData: true,
   attributes: true, attributeFilter: ["aria-label", "aria-disabled", "disabled", "data-testid"],
 });
+window.addEventListener("spacecast:presentationsync", reconcileSpace);
 window.addEventListener("popstate", reconcileSpace);
 window.addEventListener("pagehide", closeSpaceSession);
 window.addEventListener("pageshow", reconcileSpace);
