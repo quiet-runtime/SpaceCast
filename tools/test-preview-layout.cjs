@@ -66,7 +66,12 @@ class Element {
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) || null; }
 }
-const context = vm.createContext({ URL });
+const observers = [];
+const context = vm.createContext({ URL, MutationObserver: class {
+  constructor(callback) { this.callback = callback; observers.push(this); }
+  observe(target, options) { this.target = target; this.options = options; }
+  disconnect() { this.disconnected = true; }
+} });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/SpacePreviewLayout.js'), 'utf8') + '\nglobalThis.Layout = SpacePreviewLayout;', context);
 const el = (tag = 'div', attrs = {}, text = '') => new Element(tag, attrs, text);
 const has = (element, name) => element.classList.contains(name);
@@ -340,6 +345,44 @@ test('a direct native action never classifies its own label artwork as explanato
   state.layout.refresh();
   assert.equal(has(join, 'ss-native-listen'), true);
   assert.equal(has(label, 'ss-notice'), false);
+});
+
+test('native class replacement repairs the existing control tags without rerendering or changing handlers', () => {
+  const state = fixture();
+  const observer = observers.at(-1);
+  const handler = state.join.onclick = () => 'native';
+  const parent = state.join.parentElement;
+  assert.deepEqual(Array.from(observer.options.attributeFilter), ['class']);
+  state.join.classList.remove('ss-native-listen');
+  state.join.classList.add('native-pressed');
+  mutations = 0;
+  observer.callback([{ target: state.join }, { target: state.join }]);
+  assert.equal(has(state.join, 'ss-native-listen'), true);
+  assert.equal(mutations, 1);
+  assert.equal(has(state.join, 'native-pressed'), true);
+  assert.equal(state.join.parentElement, parent);
+  assert.equal(state.join.onclick, handler);
+  mutations = 0;
+  observer.callback([{ target: state.join }]);
+  assert.equal(mutations, 0);
+  state.layout.dispose();
+  assert.equal(observer.disconnected, true);
+  observer.callback([{ target: state.join }]);
+  assert.equal(has(state.join, 'ss-native-listen'), false);
+});
+
+test('native class repair ignores untagged controls and removed controls', () => {
+  const state = fixture();
+  const observer = observers.at(-1);
+  const unrelated = el('button', {}, 'Share');
+  state.body.append(unrelated);
+  state.join.remove();
+  state.join.classList.remove('ss-native-listen');
+  mutations = 0;
+  observer.callback([{ target: unrelated }, { target: state.join }]);
+  assert.equal(mutations, 0);
+  assert.equal(has(state.join, 'ss-native-listen'), false);
+  assert.equal(has(unrelated, 'ss-native-listen'), false);
 });
 
 test('switch art tagging never hides a sibling label or another native input', () => {

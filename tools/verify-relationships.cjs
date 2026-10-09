@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const evidence = path.resolve(process.env.SPACECAST_RELATIONSHIP_EVIDENCE || path.join(os.tmpdir(), `spacecast-relationships-${Date.now()}`));
 fs.mkdirSync(evidence, { recursive: true });
 const stage = fs.mkdtempSync(path.join(evidence, 'fixture-extension-'));
-const files = ['js/RelationshipReader.js', 'js/RelationshipBadges.js', 'js/AppearanceSettings.js', 'css/spacecast.css'];
+const files = ['js/RelationshipLoader.js', 'js/RelationshipReader.js', 'js/RelationshipBadges.js', 'js/AppearanceSettings.js', 'css/spacecast.css'];
 const hashes = () => Object.fromEntries(files.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const sourceHashes = hashes();
 const harnessHash = crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex');
@@ -26,14 +26,14 @@ const fixture = `<!doctype html><meta charset="utf-8"><style>body{background:#08
 <div data-testid="sheetDialog" class="ss-sheet"><h2>Account relationships</h2><p>Relative to your signed-in X account</p><div class="ss-people"></div><button id="native-join">Native test action</button></div>
 <script>
 const defaults={following:false,followed_by:false,blocking:false,blocked_by:false,muting:false,follow_request_sent:false};
-const states=[{following:true,followed_by:true},{following:true},{followed_by:true},{blocking:true},{blocked_by:true},{muting:true},{follow_request_sent:true},{},null,{}];
+const states=[{following:true,followed_by:true},{following:true},{followed_by:true},{blocking:true},{blocked_by:true},{muting:true},{follow_request_sent:true},{},null,{},null];
 const state={entities:{users:{entities:{}}}},roster=[];
 for(let n=0;n<states.length;n++){const id=String(100+n),name='person'+n;roster.push({user_id:id,twitter_screen_name:name,periscope_user_id:'native'+n});if(states[n])state.entities.users.entities[id]={id_str:id,screen_name:name,...defaults,...states[n]};}
-const native={viewerUserId:'109',store:{getState:()=>state}},props={audioSpaceId:'room1',host:roster[0],cohosts:[],participants:{admins:[roster[0]],speakers:roster.slice(1),listeners:[]}};
+const nativeRequests=[];let hovers=0;const native={viewerUserId:'109',store:{getState:()=>state,dispatch:thunk=>thunk(()=>{},()=>state,{api:{withEndpoint:callback=>callback({apiClient:{graphQL:(operation,variables)=>{nativeRequests.push({operation,variables,at:performance.now()});return new Promise(resolve=>setTimeout(()=>resolve({users:variables.userIds.filter(id=>id==='110').map(id=>({result:{__typename:'User',rest_id:id,core:{screen_name:'person10'},relationship_perspectives:{following:true,followed_by:true,blocking:false,blocked_by:false,muting:false},follow_request_sent:false}}))}),60));}}})}})}},props={audioSpaceId:'room1',host:roster[0],cohosts:[],participants:{admins:[roster[0]],speakers:roster.slice(1),listeners:[]}};
 const cards=[];
-for(let n=0;n<roster.length;n++){const card=document.createElement('div');card.className='ss-person';card.innerHTML='<div class="ss-person-avatar"><a href="/person'+n+'" aria-label="Open profile"></a></div><div class="ss-person-name">Person '+n+'</div><div class="ss-person-role">Speaker</div>';document.querySelector('.ss-people').append(card);cards.push(card);
+for(let n=0;n<roster.length;n++){const card=document.createElement('div');card.className='ss-person';card.innerHTML='<div class="ss-person-avatar"><a href="/person'+n+'" aria-label="Open profile"></a></div><div class="ss-person-name">Person '+n+'</div><div class="ss-person-role">Speaker</div>';document.querySelector('.ss-people').append(card);cards.push(card);card.addEventListener('mouseenter',()=>hovers++);
  const chain=Array.from({length:214},()=>({memoizedProps:{}}));for(let i=0;i<213;i++){chain[i].return=chain[i+1];chain[i+1].child=chain[i];}chain[0].stateNode=card;chain[2].memoizedProps={screenName:'person'+n};chain[7].memoizedProps=props;let deps={memoizedValue:native};for(let j=0;j<31;j++)deps={memoizedValue:{unused:j},next:deps};chain[8].dependencies={firstContext:deps};chain[213].tag=3;chain[213].stateNode={current:chain[213]};card.__reactFiber$fixture=chain[0];}
-window.fixture={state,cards,props,native,clicks:0};document.querySelector('#native-join').onclick=()=>fixture.clicks++;
+window.fixture={state,cards,props,native,nativeRequests,get hovers(){return hovers},clicks:0};document.querySelector('#native-join').onclick=()=>fixture.clicks++;
 </script>`;
 const errors = [], unexpected = [], results = [];
 let context;
@@ -49,9 +49,16 @@ async function run() {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('https://x.com/home');
   await page.waitForFunction(() => document.querySelector('[data-ss-relationship="mutual"]'), { timeout: 8000 });
-  assert.deepEqual(await page.locator('.ss-relationship').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-ss-relationship'))), ['mutual','following','follower','blocked','blockedBy','muted','requested','none','unknown','self']);
+  await page.waitForFunction(() => fixture.cards[10].querySelector('[data-ss-relationship="mutual"]'), { timeout: 3000 });
+  const loaded = await page.evaluate(() => ({ hovers:fixture.hovers,requests:fixture.nativeRequests,cache:fixture.state.entities.users.entities['110'],elapsed:performance.now()-fixture.nativeRequests[0].at }));
+  assert.equal(loaded.hovers, 0); assert.equal(loaded.cache, undefined); assert.equal(loaded.requests.length, 1);
+  assert.deepEqual([...loaded.requests[0].variables.userIds].sort(), ['108','110']);
+  assert.equal(loaded.requests[0].operation.operationName, 'UsersByRestIds');
+  assert.ok(loaded.elapsed < 1200, `Native preload rendered promptly: ${loaded.elapsed}ms`);
+  results.push('Missing participant relationships autoload through one native X batch before any avatar hover');
+  assert.deepEqual(await page.locator('.ss-relationship').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-ss-relationship'))), ['mutual','following','follower','blocked','blockedBy','muted','requested','none','unknown','self','mutual']);
   results.push('All ten relationship labels cross the real MAIN/isolated extension boundary');
-  assert.deepEqual(await page.locator('.ss-person-role').allTextContents(), Array(10).fill('Speaker'));
+  assert.deepEqual(await page.locator('.ss-person-role').allTextContents(), Array(11).fill('Speaker'));
   await page.getByRole('button', { name: 'Native test action' }).click();
   assert.equal(await page.evaluate(() => fixture.clicks), 1);
   results.push('Native role text, identity, and click handler remain intact');
@@ -89,7 +96,7 @@ async function run() {
   await page.evaluate(() => document.dispatchEvent(new Event('fixture:enable')));
   await page.waitForFunction(() => document.querySelector('[data-ss-relationship="follower"]'));
   await page.evaluate(() => document.dispatchEvent(new Event('fixture:dispose')));
-  assert.equal(await page.locator('.ss-relationship,[data-ss-relation-key],[data-ss-relation-sheet]').count(), 0);
+  assert.equal(await page.locator('.ss-relationship,[data-ss-relation-key],[data-ss-relation-sheet],[data-ss-relation-enabled]').count(), 0);
   results.push('Settings disable and cleanup remove every owned chip and token');
   assert.deepEqual(errors, []); assert.deepEqual(unexpected, []); assert.deepEqual(hashes(), sourceHashes);
 }
