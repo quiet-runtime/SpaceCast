@@ -365,3 +365,21 @@ html.ss-page-unlocked body { overflow: visible !important; overscroll-behavior: 
   #spacecast-panel .ss-footer { gap: 3px 7px; }
   #spacecast-panel .ss-footer-actions { gap: 7px; }
 }
+
+/* Separate chips never alter native names, role text, avatar click targets or handlers. */
+.ss-sheet .ss-person > .ss-relationship {
+  box-sizing: border-box !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  flex: 0 0 auto !important; gap: 3px !important; max-width: 100% !important;
+  min-height: 17px !important; padding: 1px 6px !important; margin: 3px 0 1px !important;
+  border: 1px solid rgba(189,147,249,.25) !important; border-radius: 6px !important;
+  background: rgba(189,147,249,.10) !important; color: #d9c4fb !important;
+  font: 500 10px/1.25 system-ui,sans-serif !important; white-space: nowrap !important;
+  overflow: hidden !important; text-overflow: ellipsis !important; direction: ltr !important;
+}
+.ss-sheet .ss-relationship > span { font: inherit !important; line-height: inherit !important; color: inherit !important; }
+.ss-sheet .ss-relationship > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.ss-sheet .ss-relationship[data-ss-relationship="mutual"] { color: #8debd6 !important; border-color: rgba(80,220,170,.3) !important; background: rgba(80,220,170,.09) !important; }
+.ss-sheet .ss-relationship:is([data-ss-relationship="blocked"],[data-ss-relationship="blockedBy"]) { color: #ff9eba !important; border-color: rgba(255,100,140,.3) !important; background: rgba(255,100,140,.09) !important; }
+.ss-sheet .ss-relationship:is([data-ss-relationship="unknown"],[data-ss-relationship="none"]) { color: #b4abbf !important; border-color: rgba(200,185,215,.15) !important; background: rgba(200,185,215,.04) !important; }
+.ss-sheet .ss-relationship[data-ss-relationship="unknown"] { border-style: dashed !important; }
