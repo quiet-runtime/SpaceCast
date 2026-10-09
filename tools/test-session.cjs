@@ -36,6 +36,7 @@ function setup(options = {}) {
     clearTimeout(id) { timers.delete(id); },
     readSpace: () => ({ title: 'Test Space' }),
     reconcileSpace() {},
+    nativeListeningActive: () => !!options.nativeActive,
     SpaceCastApi: class {
       async AudioSpaceById() {
         if (options.metadataError) throw new Error(options.metadataError);
@@ -54,6 +55,7 @@ function setup(options = {}) {
   vm.runInContext(lifecycle + '\nglobalThis.api = { openSpaceSession, closeSpaceSession, setSession(value) { spaceSession = value; } };', context);
   const session = {
     space: { id: 'test-space' }, controller: new AbortController(),
+    autoplay: options.autoplay !== false,
     panel: {
       audio: { currentTime: 10, play() { played++; return Promise.resolve(); } },
       setError(value) { errors.push(value); }, setRetry(value) { retries.push(value); },
@@ -61,7 +63,7 @@ function setup(options = {}) {
     },
   };
   context.api.setSession(session);
-  return { api: context.api, session, timers, errors, retries,
+  return { api: context.api, context, session, timers, errors, retries,
     get hls() { return hls; }, get played() { return played; },
     get cacheStarted() { return cacheStarted; }, get cacheDestroyed() { return cacheDestroyed; } };
 }
@@ -149,4 +151,30 @@ test('a closing session ignores manifest playback, retry and recovery callbacks 
   assert.equal(state.errors.length, errors);
   assert.equal(state.retries.length, retries);
   assert.equal(state.timers.size, 0);
+});
+
+test('a preview opened while native listening is active loads paused', async () => {
+  const state = setup({ autoplay: false, nativeActive: true });
+  await state.api.openSpaceSession(state.session);
+  state.hls.emit('parsed');
+  state.hls.emit('buffered');
+  assert.equal(state.played, 0);
+  assert.equal(state.cacheStarted, true);
+  assert.equal(state.cacheDestroyed, false);
+  assert.equal(state.errors.at(-1), '');
+});
+
+test('native listening detected during startup prevents late manifest autoplay', async () => {
+  const state = setup();
+  await state.api.openSpaceSession(state.session);
+  state.context.nativeListeningActive = () => true;
+  state.hls.emit('parsed');
+  assert.equal(state.played, 0);
+});
+
+test('an ordinary preview autoplays after its manifest is ready', async () => {
+  const state = setup();
+  await state.api.openSpaceSession(state.session);
+  state.hls.emit('parsed');
+  assert.equal(state.played, 1);
 });

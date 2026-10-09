@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../js/SpaceCast.js'), 'utf8');
 const navigation = source.slice(source.indexOf('function requestSpaceClose('), source.indexOf('new MutationObserver(() => {', source.indexOf('function reconcileSpace()')));
 
-function setup({ connected = false, route = '/explore', paused = false, docked = false } = {}) {
+function setup({ connected = false, route = '/explore', paused = false, docked = false, nativeActive = false, openedDuringNative = false } = {}) {
   const calls = { pause: 0, dock: 0, native: 0, release: 0, close: 0, opened: [], resumed: [], refresh: 0 };
   const sheet = { isConnected: connected, style: { left: '45px', top: '75px' }, dataset: { minimized: 'false' } };
   const panel = {
@@ -19,19 +19,19 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
     dispose() {},
   };
   const engine = { hls: {}, cache: {} };
-  const session = { space: panel.space, panel, controller: new AbortController(), ...engine };
+  const session = { space: panel.space, panel, controller: new AbortController(), openedDuringNative, ...engine };
   if (docked) panel.dock = { root: { style: {} }, refresh() { panel.element.isConnected = true; } };
   const location = { pathname: route, search: '' };
   let native = null;
   const context = vm.createContext({
     URLSearchParams, AbortController, location, clearTimeout() {}, queueMicrotask() {}, console: { warn() {} },
-    document: { addEventListener() {} }, nativeListeningActive() { return false; },
+    document: { addEventListener() {} }, nativeListeningActive() { return nativeActive; },
     SpaceDock: { snapshot(_sheet, _space, prior) { return prior; } },
     nativeSpaceSheet() { return native; },
     mountSpaceDock(target, options) { calls.dock++; calls.dockOptions = options; target.element.isConnected = true; target.dock = { refresh() { target.element.isConnected = true; } }; },
     mountPanel(target) { calls.native++; target.nativeSheet = native; target.element.isConnected = true; return true; },
     closeSpaceSession() { calls.close++; context.api.setSession(null); },
-    createPanel(space) { return { space, element: { isConnected: false }, dispose() {} }; },
+    createPanel(space) { return { space, element: { isConnected: false }, dispose() {}, refreshShell() {}, setPlaybackNotice(message) { this.playbackNotice = message; } }; },
     openSpaceSession(value) { calls.opened.push(value.space.id); },
   });
   vm.runInContext('let spaceSession; let dismissedSpacePath="";let nativeOwnedSpaceId="";let nativeOwnedSpacePath="";let nativeOwnedWasActive=false;let nativeLeavePending=false;\n' + navigation + '\nglobalThis.api={reconcileSpace,requestSpaceClose,setSession(v){spaceSession=v},getSession(){return spaceSession}};', context);
@@ -236,6 +236,52 @@ test('active native listening stays exclusive while navigating and reopening Man
   }
   assert.deepEqual(state.calls.opened, []);
   assert.equal(state.calls.dock, 0);
+});
+
+test('existing native listening allows a new preview with autoplay disabled', () => {
+  const state = setup({ route: '/i/spaces/spaceTwo/peek', nativeActive: true });
+  state.context.api.setSession(null);
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  const session = state.context.api.getSession();
+  assert.equal(session.space.id, 'spaceTwo');
+  assert.equal(session.autoplay, false);
+  assert.equal(session.openedDuringNative, true);
+  assert.deepEqual(state.calls.opened, ['spaceTwo']);
+  state.context.api.reconcileSpace();
+  assert.equal(state.context.api.getSession(), session);
+  assert.equal(state.calls.close, 0);
+});
+
+test('native handoff for one Space does not blacklist a different preview', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  state.panel.pendingClose();
+  state.context.nativeListeningActive = () => true;
+  state.location.pathname = '/i/spaces/spaceTwo/peek';
+  state.native({ isConnected: true });
+  state.context.api.reconcileSpace();
+  const preview = state.context.api.getSession();
+  assert.equal(preview.space.id, 'spaceTwo');
+  assert.equal(preview.autoplay, false);
+  assert.equal(preview.openedDuringNative, true);
+  state.context.api.reconcileSpace();
+  assert.equal(state.context.api.getSession(), preview);
+  assert.equal(state.calls.close, 1);
+});
+
+test('temporary removal of the native listening indicator preserves an already-paused preview', () => {
+  const state = setup({ connected: true, paused: true, nativeActive: true, openedDuringNative: true, route: '/i/spaces/spaceOne/peek' });
+  state.native(state.sheet);
+  for (const active of [true, false, true]) {
+    state.context.nativeListeningActive = () => active;
+    state.context.api.reconcileSpace();
+    assert.equal(state.context.api.getSession(), state.session);
+    assert.equal(state.session.openedDuringNative, true);
+  }
+  assert.equal(state.calls.close, 0);
+  assert.equal(state.calls.pause, 0);
+  assert.deepEqual(state.calls.opened, []);
 });
 
 const sheetSelectorSource = source.slice(source.indexOf('function nativeSpaceSheet()'), source.indexOf('function nativeListeningActive()'));
