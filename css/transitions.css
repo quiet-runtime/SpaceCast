@@ -1,0 +1,16 @@
+/* Geometry stays measurable while native and integrated presentation hand off. */
+[data-ss-presentation="opening"],
+[data-ss-presentation="closing"] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+[data-ss-presentation="opening"] *,
+[data-ss-presentation="closing"] * {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: none !important;
+  animation: none !important;
+}
