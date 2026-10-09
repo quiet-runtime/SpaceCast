@@ -12,7 +12,7 @@ class SpacePreviewLayout {
   static isJoinControl(element) {
     if (!element?.matches('button, [role="button"]')) return false;
     const label = (element.getAttribute("aria-label") || element.textContent || "").replace(/\s+/g, " ").trim();
-    return /^(?:start (?:listening|speaking)|join(?: (?:this )?space)?)$/i.test(label);
+    return /^(?:start (?:listening(?: anonymously)?|speaking)|join(?: (?:this )?space)?)$/i.test(label);
   }
 
   static isProfileLink(element) {
