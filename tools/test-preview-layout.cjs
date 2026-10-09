@@ -252,3 +252,106 @@ test('anonymous role buttons preserve disabled and hidden state without broadeni
     assert.equal(context.Layout.isJoinControl(el('button', {}, text)), false);
   }
 });
+
+function nativeAnonymous() {
+  const toggle = el('input', { type: 'checkbox', role: 'switch', 'aria-label': 'Listen anonymously' });
+  toggle.checked = true;
+  const track = el(), thumb = el();
+  const surface = el('div', { style: 'height:20px;width:40px' }).append(track, thumb, toggle);
+  const label = el('div', {}, 'Listen anonymously');
+  const row = el().append(label, surface);
+  return { toggle, track, thumb, surface, label, row, section: el().append(row) };
+}
+
+test('native checkbox uses exactly its own surface and sibling artwork without changing its state or label', () => {
+  const state = fixture();
+  const anonymous = nativeAnonymous();
+  const handler = anonymous.toggle.onchange = () => 'native-toggle';
+  state.details.append(anonymous.section);
+  state.layout.refresh();
+  assert.equal(has(anonymous.surface, 'ss-anonymous-switch'), true);
+  assert.equal(has(anonymous.toggle, 'ss-anonymous-input'), true);
+  assert.equal(has(anonymous.toggle, 'ss-anonymous-switch'), false);
+  assert.equal(has(anonymous.track, 'ss-anonymous-artwork'), true);
+  assert.equal(has(anonymous.thumb, 'ss-anonymous-artwork'), true);
+  assert.equal(has(anonymous.label, 'ss-anonymous-artwork'), false);
+  assert.equal(has(anonymous.row, 'ss-anonymous-row'), true);
+  assert.equal(has(anonymous.section, 'ss-anonymous-wrap'), true);
+  assert.equal(anonymous.toggle.parentElement, anonymous.surface);
+  assert.equal(anonymous.toggle.checked, true);
+  assert.equal(anonymous.toggle.getAttribute('aria-checked'), null);
+  assert.equal(anonymous.toggle.onchange, handler);
+  mutations = 0;
+  state.layout.refresh();
+  assert.equal(mutations, 0);
+  state.layout.dispose();
+  assert.equal(has(anonymous.track, 'ss-anonymous-artwork'), false);
+  assert.equal(has(anonymous.surface, 'ss-anonymous-switch'), false);
+});
+
+test('two native actions preserve order, wrappers, handlers, and disabled or hidden states', () => {
+  const state = fixture();
+  const anonymous = el('button', { 'aria-label': 'Start listening anonymously' }, 'Start listening anonymously');
+  const speaker = el('button', { 'aria-label': 'Start speaking', 'aria-disabled': 'true', disabled: '' }, 'Start speaking');
+  const anonymousHandler = anonymous.onclick = () => 'anonymous';
+  const speakerHandler = speaker.onclick = () => 'speaker';
+  const firstWrap = el().append(anonymous);
+  const secondWrap = el('div', { hidden: '', style: 'display: none;' }).append(speaker);
+  const actions = el().append(firstWrap, secondWrap);
+  const notice = el('p', {}, 'Choose how to join');
+  state.footer.replaceChildren(notice, actions);
+  state.layout.refresh();
+  for (const node of [actions, firstWrap, secondWrap]) assert.equal(has(node, 'ss-native-actions'), true);
+  for (const node of [anonymous, speaker]) assert.equal(has(node, 'ss-native-listen'), true);
+  assert.equal(has(notice, 'ss-notice'), true);
+  assert.equal(anonymous.parentElement, firstWrap);
+  assert.equal(speaker.parentElement, secondWrap);
+  assert.equal(actions.children[0], firstWrap);
+  assert.equal(actions.children[1], secondWrap);
+  assert.equal(anonymous.onclick, anonymousHandler);
+  assert.equal(speaker.onclick, speakerHandler);
+  assert.equal(secondWrap.getAttribute('hidden'), '');
+  assert.equal(secondWrap.getAttribute('style'), 'display: none;');
+  assert.equal(speaker.getAttribute('disabled'), '');
+  assert.equal(speaker.getAttribute('aria-disabled'), 'true');
+});
+
+test('a shared toggle and action footer keeps its row and explanatory copy distinct', () => {
+  const state = fixture();
+  const anonymous = nativeAnonymous();
+  const speaker = el('button', {}, 'Start speaking');
+  const notice = el('p', {}, 'Your mic will be off');
+  state.footer.replaceChildren(anonymous.section, notice, state.join, speaker);
+  state.layout.refresh();
+  assert.equal(has(anonymous.row, 'ss-anonymous-row'), true);
+  assert.equal(has(state.footer, 'ss-anonymous-row'), false);
+  assert.equal(has(anonymous.section, 'ss-notice'), false);
+  assert.equal(has(notice, 'ss-notice'), true);
+  assert.equal(has(state.join, 'ss-native-listen'), true);
+  assert.equal(has(speaker, 'ss-native-listen'), true);
+  assert.equal(state.join.nextElementSibling, speaker);
+});
+
+test('a direct native action never classifies its own label artwork as explanatory copy', () => {
+  const state = fixture();
+  const label = el('div').append(el('span', {}, 'Start listening anonymously'));
+  const join = el('button', { 'aria-label': 'Start listening anonymously' }).append(label);
+  state.details.replaceChildren(join);
+  state.layout.refresh();
+  assert.equal(has(join, 'ss-native-listen'), true);
+  assert.equal(has(label, 'ss-notice'), false);
+});
+
+test('switch art tagging never hides a sibling label or another native input', () => {
+  const state = fixture();
+  const label = el('span', {}, 'Listen anonymously');
+  const toggle = el('input', { type: 'checkbox', role: 'switch', 'aria-label': 'Listen anonymously' });
+  const other = el('input', { type: 'checkbox' });
+  const section = el().append(label, toggle, other);
+  state.details.append(section);
+  state.layout.refresh();
+  assert.equal(has(label, 'ss-anonymous-artwork'), false);
+  assert.equal(has(other, 'ss-anonymous-artwork'), false);
+  assert.equal(has(section, 'ss-anonymous-switch'), false);
+  assert.equal(has(toggle, 'ss-anonymous-switch'), true);
+});
