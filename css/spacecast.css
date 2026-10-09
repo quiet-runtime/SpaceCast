@@ -258,10 +258,21 @@ html.ss-page-unlocked body { overflow: visible !important; overscroll-behavior: 
 .ss-sheet .ss-listeners * { font-size: 10px !important; line-height: 14px !important; }
 .ss-sheet .ss-anonymous { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; padding: 3px 0 !important; margin: 0 !important; min-height: 28px !important; font-size: 10px !important; line-height: 16px !important; }
 .ss-sheet .ss-anonymous * { font-size: 10px !important; line-height: 16px !important; }
-.ss-sheet .ss-anonymous [role=switch] { transform: scale(.76); transform-origin: right center; }
+/* Keep X's accessible switch and events; draw the SpaceCast surface over its native artwork. */
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch]) { position: relative !important; display: inline-flex !important; flex: 0 0 auto !important; box-sizing: border-box !important; width: 36px !important; min-width: 36px !important; height: 22px !important; min-height: 22px !important; padding: 0 !important; border: 1px solid #d9c5f52b !important; border-radius: 999px !important; background: #3b3348 !important; box-shadow: inset 0 1px 2px #0004 !important; color: transparent !important; font-size: 0 !important; transform: none !important; appearance: none !important; cursor: pointer; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch]) > * { opacity: 0 !important; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch])::after { content: "" !important; position: absolute !important; inset-block-start: 2px !important; inset-inline-start: 2px !important; width: 16px !important; height: 16px !important; border: 0 !important; border-radius: 50% !important; background: #f3eaff !important; box-shadow: 0 1px 4px #0005 !important; pointer-events: none; transition: inset-inline-start .15s ease; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch])[aria-checked=true] { background: linear-gradient(125deg,#cfa8fb,#a77bd7) !important; border-color: #eddaff55 !important; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch])[aria-checked=true]::after { inset-inline-start: 16px !important; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch]):focus-visible { outline: 2px solid #8be9fd !important; outline-offset: 3px; }
+.ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch]):is(:disabled,[aria-disabled=true]) { opacity: .45 !important; cursor: default; }
+.ss-sheet .ss-anonymous[hidden], .ss-sheet :is(.ss-anonymous[role=switch], .ss-anonymous [role=switch])[hidden] { display: none !important; }
 .ss-sheet .ss-native-footer { position: relative !important; inset: auto !important; flex: none !important; max-height: none !important; overflow: visible !important; margin: 2px 0 0 !important; padding: 0 !important; }
 .ss-sheet .ss-notice { color: #bbb0cc !important; font-size: 10px !important; line-height: 14px !important; margin: 3px 0 6px !important; padding: 0 !important; text-align: center !important; }
 .ss-sheet .ss-notice * { font-size: 10px !important; line-height: 14px !important; }
+.ss-sheet .ss-notice a { color: #d2adff !important; text-decoration: none; }
+.ss-sheet .ss-notice a:hover { text-decoration: underline; }
+.ss-sheet .ss-notice a:focus-visible { outline: 2px solid #8be9fd; outline-offset: 2px; border-radius: 2px; }
 .ss-sheet .ss-native-listen, .ss-sheet .ss-native-footer > button { width: 100% !important; min-height: 34px !important; height: 34px !important; padding: 6px 10px !important; margin: 0 !important; border: 1px solid #ffffff25 !important; border-radius: 11px !important; background: linear-gradient(125deg,#d5b4fbdd,#b58be1dd) !important; box-shadow: inset 0 1px 0 #ffffff40,0 4px 12px #bd93f912 !important; color: #241433 !important; font-size: 12px !important; font-weight: 650 !important; }
 .ss-sheet .ss-native-listen *, .ss-sheet .ss-native-footer > button * { color: #241433 !important; font-size: 12px !important; line-height: 18px !important; }
 .ss-sheet[data-minimized=true] #spacecast-panel, .ss-sheet[data-minimized=true] .ss-native-details { display: none !important; }
