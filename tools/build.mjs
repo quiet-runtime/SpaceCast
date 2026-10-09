@@ -16,6 +16,12 @@ export function build(browser) {
   fs.mkdirSync(out, { recursive: true });
   for (const folder of runtimeFolders) fs.cpSync(path.join(root, folder), path.join(out, folder), { recursive: true });
   for (const name of documents) fs.copyFileSync(path.join(root, name), path.join(out, name));
+  const readme = path.join(out, "README.md");
+  const packagedReadme = fs.readFileSync(readme, "utf8").replace(
+    /!\[([^\]]*)\]\((docs\/images\/[^)]+)\)/g,
+    "[$1](https://github.com/quiet-runtime/SpaceCast/blob/main/$2)",
+  );
+  fs.writeFileSync(readme, packagedReadme);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
   if (browser === "firefox") {
