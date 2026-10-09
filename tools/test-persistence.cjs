@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../js/SpaceCast.js'), 'utf8
 const navigation = source.slice(source.indexOf('function requestSpaceClose('), source.indexOf('new MutationObserver(() => {', source.indexOf('function reconcileSpace()')));
 
 function setup({ connected = false, route = '/explore', paused = false, docked = false, nativeActive = false, openedDuringNative = false } = {}) {
-  const calls = { pause: 0, dock: 0, native: 0, release: 0, close: 0, opened: [], resumed: [], refresh: 0 };
+  const calls = { events: [], pause: 0, dock: 0, native: 0, release: 0, close: 0, opened: [], resumed: [], refresh: 0 };
   const sheet = { isConnected: connected, style: { left: '45px', top: '75px' }, dataset: { minimized: 'false' } };
   const panel = {
     space: { id: 'spaceOne', title: 'Original Space' }, element: { isConnected: connected, style: {} },
@@ -18,6 +18,7 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
     refreshShell() { calls.refresh++; }, requestClose(callback) { if (!this.pendingClose) this.pendingClose = callback; },
     dispose() {},
   };
+  sheet.contains = element => connected && element === panel.element;
   const engine = { hls: {}, cache: {} };
   const session = { space: panel.space, panel, controller: new AbortController(), openedDuringNative, ...engine };
   if (docked) panel.dock = { root: { style: {} }, refresh() { panel.element.isConnected = true; } };
@@ -25,12 +26,13 @@ function setup({ connected = false, route = '/explore', paused = false, docked =
   let native = null;
   const context = vm.createContext({
     URLSearchParams, AbortController, location, clearTimeout() {}, queueMicrotask() {}, console: { warn() {} },
+    SpaceCastPresentation: { dismiss(sheet) { calls.events.push("veil"); calls.veiled = sheet; }, release() {} },
     document: { addEventListener() {} }, nativeListeningActive() { return nativeActive; },
     SpaceDock: { snapshot(_sheet, _space, prior) { return prior; } },
     nativeSpaceSheet() { return native; },
     mountSpaceDock(target, options) { calls.dock++; calls.dockOptions = options; target.element.isConnected = true; target.dock = { refresh() { target.element.isConnected = true; } }; },
     mountPanel(target) { calls.native++; target.nativeSheet = native; target.element.isConnected = true; return true; },
-    closeSpaceSession() { calls.close++; context.api.setSession(null); },
+    closeSpaceSession() { calls.events.push("dispose"); calls.close++; context.api.setSession(null); },
     createPanel(space) { return { space, element: { isConnected: false }, dispose() {}, refreshShell() {}, setPlaybackNotice(message) { this.playbackNotice = message; } }; },
     openSpaceSession(value) { calls.opened.push(value.space.id); },
   });
@@ -362,4 +364,27 @@ test('whole-tab framing is never accepted as a fallback for moved Space capture'
   assert.equal(state.video.stopped, 1);
   assert.equal(state.calls.length, 0);
   assert.match(state.context.api.error(), /video capture stopped/);
+});
+
+
+test('closing veils an owned sheet before disposing styles and invoking native dismissal', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { onClosed: () => state.calls.events.push('native close') });
+  assert.deepEqual(state.calls.events, [], 'retain themed save UI until pending recording work completes');
+  state.panel.pendingClose();
+  assert.equal(state.calls.veiled, state.sheet);
+  assert.deepEqual(state.calls.events, ['veil', 'dispose', 'native close']);
+});
+
+test('immediate native handoff veils only the sheet that still owns this player', () => {
+  const state = setup({ connected: true, route: '/i/spaces/spaceOne/peek' });
+  state.context.api.requestSpaceClose(state.session, { native: true, hide: true });
+  assert.equal(state.calls.events[0], 'veil');
+  assert.equal(state.calls.veiled, state.sheet);
+  const reused = setup({ connected: true, route: '/i/spaces/spaceTwo/peek' });
+  reused.sheet.contains = () => false;
+  reused.context.api.requestSpaceClose(reused.session, { hide: true });
+  reused.panel.pendingClose();
+  assert.equal(reused.calls.veiled, undefined);
+  assert.deepEqual(reused.calls.events, ['dispose']);
 });
