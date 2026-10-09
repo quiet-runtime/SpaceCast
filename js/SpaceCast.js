@@ -1345,6 +1345,7 @@ function createPanel(space) {
       playbackError = message;
       render();
     },
+    setPlaybackNotice(message) { player.status.textContent = message; },
     dispose() {
       disposed = true;
       clearInterval(clock);
@@ -1386,78 +1387,14 @@ function nativeListeningActive() {
   return !!document.querySelector('[aria-label="Manage Space"]');
 }
 
-function mountPanel(panel, isPeek) {
+function mountPanel(panel, isPeek, windowState = {}) {
   if (isPeek) {
     const sheet = nativeSpaceSheet();
     if (!sheet) return false;
     panel.nativeSheet = sheet;
-    const tagged = [];
-    const tag = (element, name) => { if (element && !element.classList.contains(name)) { element.classList.add(name); tagged.push([element, name]); } };
-    const attributes = [];
-    const automaticDirection = element => {
-      if (!element || element.getAttribute("dir") === "auto") return;
-      attributes.push([element, "dir", element.getAttribute("dir")]);
-      element.setAttribute("dir", "auto");
-    };
-    tag(sheet, "ss-sheet");
-    const body = sheet.firstElementChild;
-    tag(body, "ss-sheet-body");
-    const anchor = sheet.querySelector(':scope > div > div > div > button');
-    let heading;
-    let details;
-    if (anchor) {
-      const toolbar = anchor.parentElement.parentElement;
-      tag(toolbar, "ss-native-toolbar");
-      heading = toolbar.nextElementSibling;
-      const nestedTitle = heading?.querySelector('h1, h2, [role="heading"]');
-      if (nestedTitle) {
-        tag(nestedTitle, "ss-native-heading");
-        tag(nestedTitle.nextElementSibling, "ss-people");
-        if (heading.lastElementChild?.tagName === "BUTTON") tag(heading.lastElementChild, "ss-native-listen");
-        nestedTitle.after(panel.element);
-      } else if (heading && !heading.contains(panel.element)) {
-        tag(heading, "ss-native-heading");
-        if (heading.children.length > 1) {
-          tag(heading.firstElementChild, "ss-sheet-rec");
-          tag(body, "ss-has-rec");
-        }
-        tag(heading.lastElementChild, "ss-sheet-title");
-        automaticDirection(heading.lastElementChild);
-        details = heading.nextElementSibling === panel.element ? panel.element.nextElementSibling : heading.nextElementSibling;
-        tag(details, "ss-native-details");
-        heading.after(panel.element);
-      } else toolbar.after(panel.element);
-    } else sheet.firstElementChild ? sheet.firstElementChild.prepend(panel.element) : sheet.prepend(panel.element);
-
-    const refresh = () => {
-      if (!details?.isConnected) return;
-      for (const child of details.children) {
-        if (child.querySelector('a[href^="/"]')) {
-          tag(child, "ss-people-wrap");
-          let grid = child;
-          while (grid.children.length === 1 && grid.firstElementChild.querySelector('a[href^="/"]')) grid = grid.firstElementChild;
-          tag(grid, "ss-people");
-          for (const card of grid.children) {
-            if (!card.querySelector('a[href^="/"]')) continue;
-            tag(card, "ss-person");
-            tag(card.children[0], "ss-person-avatar");
-            tag(card.children[1], "ss-person-name");
-            tag(card.children[2], "ss-person-role");
-          }
-        } else if (child.querySelector('[role="switch"]')) {
-          tag(child, "ss-anonymous");
-        } else if (child.querySelector('button')) {
-          tag(child, "ss-native-footer");
-          tag(child.firstElementChild, "ss-notice");
-          tag(child.querySelector('button'), "ss-native-listen");
-        } else {
-          tag(child, "ss-listeners");
-          tag(child.firstElementChild, "ss-listeners-inner");
-        }
-      }
-    };
-    refresh();
-    panel.setShellRefresh(refresh);
+    const layout = new SpacePreviewLayout(sheet, panel.element);
+    const { body, heading, closeButton: anchor } = layout;
+    if (!body) { layout.dispose(); return false; }
     const grip = document.createElement("button");
     grip.type = "button";
     grip.className = "ss-sheet-grip";
@@ -1467,6 +1404,11 @@ function mountPanel(panel, isPeek) {
     const shell = new SpaceSheet(sheet);
     const glass = new SpaceGlassWindow(sheet, { header: heading || body, titleElement: grip, controls: ["minimize"], controlsContainer: body });
     const disposeAppearance = applySpaceAppearance(sheet, panel);
+    if (windowState.position) {
+      glass.position = { ...windowState.position };
+      glass.clampPosition();
+    }
+    if (windowState.minimized) glass.setMinimized(true);
     let closing = false;
     let escapeTurn = null;
     const rememberEscape = event => {
@@ -1490,7 +1432,8 @@ function mountPanel(panel, isPeek) {
     // Stop our player before X starts native audio, regardless of its next URL.
     const join = event => {
       const target = event.target?.closest?.(".ss-native-listen");
-      if (target && sheet.contains(target) && !panel.element.contains(target)) {
+      if (target && sheet.contains(target) && !panel.element.contains(target) &&
+          !target.disabled && target.getAttribute("aria-disabled") !== "true") {
         requestSpaceClose(spaceSession, { native: true, hide: true });
       }
     };
@@ -1506,12 +1449,20 @@ function mountPanel(panel, isPeek) {
       glass.dispose();
       shell.dispose();
       grip.remove();
-      for (const [element, name] of tagged) element.classList.remove(name);
-      for (const [element, name, previous] of attributes) {
-        if (element.getAttribute(name) !== "auto") continue;
-        if (previous === null) element.removeAttribute(name);
-        else element.setAttribute(name, previous);
+      layout.dispose();
+    });
+    panel.setShellRefresh(() => {
+      const playing = panel.wantsPlayback();
+      layout.refresh();
+      // React can replace the toolbar as well as the footer. Rebind our shell
+      // to the new native controls while keeping the same audio/cache session.
+      if (layout.body !== body || layout.heading !== heading || layout.closeButton !== anchor) {
+        const position = { ...glass.position };
+        const minimized = glass.minimized;
+        panel.releaseShell();
+        mountPanel(panel, true, { position, minimized });
       }
+      panel.resumeAfterMove(playing);
     });
     panel.spaceSnapshot = SpaceDock.snapshot(sheet, panel.space, panel.spaceSnapshot);
     return true;
@@ -1640,7 +1591,9 @@ async function openSpaceSession(session) {
       panel.setRetry(null);
     });
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      if (current()) panel.audio.play().catch(() => {});
+      // Opening a preview must not interrupt or overlap an existing native Space.
+      // A paused preview still caches audio and can be played by an explicit gesture.
+      if (current() && session.autoplay !== false && !nativeListeningActive()) panel.audio.play().catch(() => {});
     });
     hls.attachMedia(panel.audio);
     hls.loadSource(url);
@@ -1747,7 +1700,7 @@ function reconcileSpace() {
   // A join can return to the background article instead of a Space URL.
   // Native ownership therefore follows user intent and X's controls, not URL alone.
   const nativeMode = new URLSearchParams(location.search).get("spacecast") === "native";
-  if (spaceSession && (nativeActive || nativeMode || (match && !match[2] && match[1] === spaceSession.space.id))) {
+  if (spaceSession && ((nativeActive && !spaceSession.openedDuringNative) || nativeMode || (match && !match[2] && match[1] === spaceSession.space.id))) {
     requestSpaceClose(spaceSession, { native: true, hide: true });
     return;
   }
@@ -1766,7 +1719,7 @@ function reconcileSpace() {
     spaceSession.panel.refreshShell();
   }
   if (!match || spaceSession || !match[2]) return;
-  if (nativeMode || nativeActive || nativeOwnedSpaceId === match[1]) return;
+  if (nativeMode || nativeOwnedSpaceId === match[1]) return;
   if (dismissedSpacePath === location.pathname) return;
   // The preview often appears before its sheet. Full native Space routes never
   // start a second player, and unrelated dialogs are never adopted.
@@ -1776,7 +1729,11 @@ function reconcileSpace() {
     const space = { id: match[1], url: "https://x.com/i/spaces/" + match[1], title: "", host: "", state: "" };
     panel = createPanel(space);
     if (!mountPanel(panel, true)) { panel.dispose(); return; }
-    const session = spaceSession = { space, panel, controller: new AbortController(), cache: null, hls: null };
+    const session = spaceSession = {
+      space, panel, controller: new AbortController(), cache: null, hls: null,
+      openedDuringNative: nativeActive, autoplay: !nativeActive,
+    };
+    if (nativeActive) panel.setPlaybackNotice("Preview paused while X is playing a Space. Press Play to listen here.");
     void openSpaceSession(session);
   } catch (error) {
     panel?.dispose();
@@ -1800,7 +1757,10 @@ new MutationObserver(() => {
   if (reconcileQueued) return;
   reconcileQueued = true;
   queueMicrotask(() => { reconcileQueued = false; reconcileSpace(); });
-}).observe(document, { childList: true, subtree: true });
+}).observe(document, {
+  childList: true, subtree: true, characterData: true,
+  attributes: true, attributeFilter: ["aria-label", "aria-disabled", "disabled", "data-testid"],
+});
 window.addEventListener("popstate", reconcileSpace);
 window.addEventListener("pagehide", closeSpaceSession);
 window.addEventListener("pageshow", reconcileSpace);
