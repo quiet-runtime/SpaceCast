@@ -10,7 +10,7 @@
   },
   "content_scripts": [
     {
-      "js": ["js/RelationshipReader.js"],
+      "js": ["js/RelationshipLoader.js", "js/RelationshipReader.js"],
       "matches": ["https://twitter.com/*", "https://x.com/*"],
       "world": "MAIN",
       "run_at": "document_start"
@@ -72,5 +72,5 @@
     "storage"
   ],
   "name": "SpaceCast",
-  "version": "1.0.6"
+  "version": "1.0.7"
 }
