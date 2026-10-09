@@ -1,12 +1,24 @@
-<p align="center">
-  <img src="icon/spacecast-prism.png" width="112" height="112" alt="SpaceCast logo">
-</p>
+![SpaceCast — Listen. Rewind. Record. Keep browsing.](docs/images/spacecast-hero.png)
 
 # SpaceCast
 
 **Listen. Rewind. Record. Keep browsing.**
 
 SpaceCast gives X Spaces a movable, resizable player with continuous live rewind, local recording, and customizable glass surfaces. The Space and its player stay together while you browse other pages on X.
+
+> **Coming next:** The official SpaceCast release on the Chrome Web Store. Until then, install the unpacked extension using the steps below.
+
+## A closer look
+
+**Your conversation, your controls.** Playback, live rewind, recording, and participants stay together in one movable window.
+
+![SpaceCast's integrated player with live rewind, recording controls, and participants](docs/images/spacecast-player.jpg)
+
+**Make it yours.** Choose Liquid glass, Dracula, OLED, or Solid, then tune the surface and accessibility settings.
+
+![SpaceCast Graphics and appearance settings with four visual styles and adjustable glass controls](docs/images/spacecast-appearance.jpg)
+
+*Screenshots show SpaceCast's actual interface rendered locally with fictional demonstration data. The banner is promotional artwork.*
 
 ## Features
 
