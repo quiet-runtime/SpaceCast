@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Graphics · SpaceCast 1.0.5</title>
+  <title>Graphics · SpaceCast 1.0.6</title>
   <link rel="stylesheet" href="../css/spacecast.css">
   <link rel="stylesheet" href="../css/appearance.css">
   <link rel="stylesheet" href="../css/options.css">
@@ -16,7 +16,7 @@
   <main class="settings-shell">
     <header class="settings-header">
       <div class="settings-brand"><img class="spacecast-logo" src="../icon/spacecast-prism.png" width="32" height="32" alt="">SpaceCast</div>
-      <span class="settings-version">1.0.5 · Graphics</span>
+      <span class="settings-version">1.0.6 · Graphics</span>
     </header>
     <div class="settings-intro"><p class="eyebrow">GRAPHICS &amp; APPEARANCE</p><h1>Your Space, your style.</h1><p>Tune your Space window. Changes appear instantly in open Spaces.</p></div>
     <div class="settings-layout">
@@ -43,6 +43,8 @@
             <div class="select-setting"><label for="participants">Participant size</label><select id="participants"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large</option></select></div>
             <label class="toggle-setting" for="spectrum"><span><strong>Audio spectrum</strong><small>Show the live audio visualizer</small></span><input id="spectrum" type="checkbox" role="switch" checked></label>
             <label class="toggle-setting" for="reducedMotion"><span><strong>Reduce motion</strong><small>Freeze the spectrum and decorative motion</small></span><input id="reducedMotion" type="checkbox" role="switch"></label>
+            <label class="toggle-setting" for="relationshipBadges"><span><strong>Account relationships</strong><small>Show your relationship to each preview participant</small></span><input id="relationshipBadges" type="checkbox" role="switch" checked></label>
+            <p class="setting-note">Mutual means you follow each other. Following means you follow them; Follows you means they follow you. Blocked, Blocks you, Muted and Requested appear only when X supplies those facts. Unknown means X has not supplied verified data. No follow means neither account follows the other. These labels are relative to your signed-in X account.</p>
           </section>
           <div class="settings-actions"><button type="button" id="reset">Reset to defaults</button><p id="save-status" role="status" aria-live="polite">Loading your settings…</p></div>
         </fieldset>
