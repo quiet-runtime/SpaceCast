@@ -50,6 +50,49 @@ class SpacePreviewLayout {
     const controls = element => [...element.querySelectorAll('button, [role="button"]')]
       .filter(control => !this.panel?.contains(control) && !this.owned(control));
     const joinControls = element => [element, ...controls(element)].filter(SpacePreviewLayout.isJoinControl);
+    const switches = element => [element, ...element.querySelectorAll('[role="switch"]')]
+      .filter(control => control.matches('[role="switch"]'));
+    const styleAnonymous = (section, toggles) => {
+      for (const toggle of toggles) {
+        let surface = toggle;
+        if (toggle.matches('input[type="checkbox"]')) {
+          const parent = toggle.parentElement;
+          // X draws its checkbox with two sibling divs, not children of the input.
+          const artwork = parent && [...parent.children].filter(element => element !== toggle);
+          if (parent && section.contains(parent) && artwork.every(element =>
+            element.matches('div, span') && !element.textContent.trim() && !controls(element).length &&
+            !element.querySelector('input, [role="switch"]'))) {
+            surface = parent;
+            tag(toggle, "ss-anonymous-input");
+            for (const element of artwork) tag(element, "ss-anonymous-artwork");
+          }
+        }
+        tag(surface, "ss-anonymous-switch");
+        if (surface === toggle) for (const element of toggle.children) tag(element, "ss-anonymous-artwork");
+        let rowFound = false;
+        for (let wrapper = surface.parentElement; wrapper && section.contains(wrapper); wrapper = wrapper.parentElement) {
+          const hasLabel = !joinControls(wrapper).length && [...wrapper.children]
+            .some(element => !element.contains(surface) && element.textContent.trim());
+          tag(wrapper, !rowFound && hasLabel ? "ss-anonymous-row" : "ss-anonymous-wrap");
+          rowFound ||= hasLabel;
+          if (wrapper === section) break;
+        }
+      }
+    };
+    const styleActions = (footer, joins, toggles) => {
+      tag(footer, "ss-native-footer");
+      for (const button of joins) {
+        tag(button, "ss-native-listen");
+        for (let wrapper = button.parentElement; wrapper && wrapper !== footer && footer.contains(wrapper); wrapper = wrapper.parentElement) {
+          tag(wrapper, "ss-native-actions");
+        }
+      }
+      if (joins.includes(footer)) return;
+      for (const element of footer.children) {
+        if (!joins.some(button => element === button || element.contains(button)) &&
+            !toggles.some(toggle => element === toggle || element.contains(toggle))) tag(element, "ss-notice");
+      }
+    };
     this.body = [...this.sheet.children].find(element => !this.owned(element)) || null;
     if (!this.body) { this.commit(wanted, autoDirection); return; }
     tag(this.body, "ss-sheet-body");
@@ -84,15 +127,14 @@ class SpacePreviewLayout {
       for (const child of details.children) {
         if (this.owned(child) || child === nestedTitle) continue;
         const joins = joinControls(child);
+        const toggles = switches(child);
+        if (toggles.length) styleAnonymous(child, toggles);
         // Native actions take priority over anchors in their explanatory copy.
         if (joins.length) {
-          tag(child, "ss-native-footer");
-          for (const button of joins) tag(button, "ss-native-listen");
-          const notice = [...child.children].find(element => !joins.some(button => element === button || element.contains(button)));
-          tag(notice, "ss-notice");
+          styleActions(child, joins, toggles);
           continue;
         }
-        if (child.matches('[role="switch"]') || child.querySelector('[role="switch"]')) {
+        if (toggles.length) {
           tag(child, "ss-anonymous");
           continue;
         }
