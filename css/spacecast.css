@@ -273,6 +273,7 @@ html.ss-page-unlocked body { overflow: visible !important; overscroll-behavior: 
 .ss-sheet .ss-anonymous-switch:has(> .ss-anonymous-input:is([hidden],[style*="display: none" i],[style*="display:none" i])) { display: none !important; }
 .ss-sheet :is(.ss-native-footer:not(.ss-native-listen), .ss-native-actions) { position: relative !important; inset: auto !important; display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; flex: none !important; width: 100% !important; min-width: 0 !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; margin: 2px 0 0 !important; padding: 0 !important; }
 .ss-sheet .ss-native-actions { margin: 0 !important; }
+.ss-sheet :is(.ss-native-footer:not(.ss-native-listen), .ss-native-actions) { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; filter: none !important; }
 .ss-sheet .ss-notice { color: #bbb0cc !important; font-size: 10px !important; line-height: 14px !important; margin: 3px 0 0 !important; padding: 0 !important; text-align: center !important; }
 .ss-sheet .ss-notice * { font-size: 10px !important; line-height: 14px !important; }
 .ss-sheet .ss-notice a { color: #d2adff !important; text-decoration: none; }
@@ -280,6 +281,11 @@ html.ss-page-unlocked body { overflow: visible !important; overscroll-behavior: 
 .ss-sheet .ss-notice a:focus-visible { outline: 2px solid #8be9fd; outline-offset: 2px; border-radius: 2px; }
 .ss-sheet .ss-native-listen { position: relative !important; inset: auto !important; display: flex !important; flex: none !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; max-width: 100% !important; min-height: 34px !important; height: auto !important; padding: 6px 10px !important; margin: 0 !important; border: 1px solid #ffffff25 !important; border-radius: 11px !important; background: linear-gradient(125deg,#d5b4fbdd,#b58be1dd) !important; box-shadow: inset 0 1px 0 #ffffff40,0 4px 12px #bd93f912 !important; color: #241433 !important; font-size: 12px !important; line-height: 18px !important; font-weight: 650 !important; white-space: normal !important; text-align: center !important; overflow-wrap: anywhere; }
 .ss-sheet .ss-native-listen * { color: #241433 !important; font-size: 12px !important; line-height: 18px !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; -webkit-line-clamp: unset !important; }
+.ss-sheet .ss-native-listen { appearance: none !important; -webkit-appearance: none !important; isolation: isolate !important; overflow: hidden !important; filter: none !important; text-shadow: none !important; }
+.ss-sheet :is(.ss-native-listen, .ss-native-actions, .ss-native-footer)::before,
+.ss-sheet :is(.ss-native-listen, .ss-native-actions, .ss-native-footer)::after,
+.ss-sheet .ss-native-listen *::before,
+.ss-sheet .ss-native-listen *::after { background: none !important; box-shadow: none !important; border-color: transparent !important; filter: none !important; pointer-events: none !important; }
 .ss-sheet .ss-native-listen:focus-visible { outline: 2px solid #8be9fd !important; outline-offset: 3px; }
 .ss-sheet .ss-native-listen:is(:disabled,[aria-disabled=true]) { opacity: .45 !important; cursor: default !important; }
 .ss-sheet :is(.ss-anonymous,.ss-anonymous-wrap,.ss-anonymous-row,.ss-anonymous-switch,.ss-anonymous-input,.ss-native-footer,.ss-native-actions,.ss-native-listen)[hidden] { display: none !important; }
@@ -305,7 +311,7 @@ html.ss-page-unlocked body { overflow: visible !important; overscroll-behavior: 
 .ss-sheet .ss-person-avatar img { width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; border-radius: 50% !important; object-fit: cover; }
 .ss-sheet .ss-person-name img { width: 1em !important; height: 1em !important; max-width: none !important; max-height: none !important; border-radius: 0 !important; vertical-align: -.1em; }
 .ss-sheet .ss-listeners-inner { padding: 0 !important; min-height: 0 !important; margin: 0 !important; border: 0 !important; background: transparent !important; }
-.ss-sheet .ss-native-listen * { background: transparent !important; box-shadow: none !important; }
+.ss-sheet .ss-native-listen * { background: transparent !important; box-shadow: none !important; text-shadow: none !important; filter: none !important; }
 @media(max-height:780px) {
   .ss-sheet .ss-people { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px 5px !important; }
   .ss-sheet #spacecast-panel .ss-eq-track { height: 47px !important; }
