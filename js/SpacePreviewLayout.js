@@ -7,6 +7,19 @@ class SpacePreviewLayout {
     this.directions = new Map();
     this.disposed = false;
     this.refresh();
+    // React replaces className when native controls change state. Repair only
+    // our existing tags before paint; rescanning the whole sheet on every
+    // native hover/press class change would create needless layout work.
+    this.classObserver = new MutationObserver(records => {
+      if (this.disposed) return;
+      for (const element of new Set(records.map(record => record.target))) {
+        if (!this.sheet.contains(element)) continue;
+        for (const name of this.tags.get(element) || []) {
+          if (!element.classList.contains(name)) element.classList.add(name);
+        }
+      }
+    });
+    this.classObserver.observe(sheet, { attributes: true, subtree: true, attributeFilter: ["class"] });
   }
 
   static isJoinControl(element) {
@@ -207,6 +220,7 @@ class SpacePreviewLayout {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.classObserver?.disconnect();
     this.commit(new Map(), new Set());
   }
 }

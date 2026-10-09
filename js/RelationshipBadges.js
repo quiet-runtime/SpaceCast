@@ -47,17 +47,23 @@
       this.prefix = "scr-" + crypto.randomUUID();
       this.nextToken = 0;
       this.entries = new Map();
-      this.enabled = true;
+      const appearance = globalThis.SpaceCastAppearance;
+      this.enabled = typeof appearance?.load !== "function";
+      this.settingsRevision = 0;
       this.disposed = false;
       this.timer = null;
       this.lastRead = -Infinity;
       this.serial = 0;
       this.generation = 0;
       this.pending = null;
+      this.urgent = false;
       sheet.setAttribute("data-ss-relation-sheet", this.prefix);
+      sheet.setAttribute("data-ss-relation-enabled", String(this.enabled));
       this.receive = event => {
         const data = event.data, pending = this.pending;
-        if (event.source !== window || event.origin !== location.origin || !pending ||
+        if (event.source !== window || event.origin !== location.origin) return;
+        if (data?.source === "spacecast:relationships:updated") { this.queue(true); return; }
+        if (!pending ||
             data?.source !== "spacecast:relationships:response" || data.id !== pending.id ||
             data.sheet !== this.prefix || data.roomId !== this.roomId) return;
         clearTimeout(pending.timer);
@@ -65,14 +71,14 @@
         pending.resolve(data);
       };
       window.addEventListener("message", this.receive);
-      this.visible = () => this.queue();
+      this.visible = () => this.queue(true);
       document.addEventListener("visibilitychange", this.visible);
       this.intersections = new IntersectionObserver(entries => {
         for (const item of entries) {
           const entry = this.entries.get(item.target);
           if (entry) entry.visible = item.isIntersecting;
         }
-        this.queue();
+        this.queue(true);
       }, { root: sheet, rootMargin: "40px" });
       this.observer = new MutationObserver(records => {
         const nativeChange = records.some(record => {
@@ -86,8 +92,17 @@
       this.observer.observe(sheet, { subtree: true, childList: true, attributes: true, attributeFilter: ["href", "data-testid"] });
       this.onAppearance = event => this.configure(event.detail?.relationshipBadges !== false);
       sheet.addEventListener("spacecast:appearancechange", this.onAppearance);
-      this.unsubscribe = globalThis.SpaceCastAppearance?.subscribe(settings => this.configure(settings.relationshipBadges !== false));
-      globalThis.SpaceCastAppearance?.load().then(settings => this.configure(settings.relationshipBadges !== false)).catch(() => {});
+      const initialSettingsRevision = this.settingsRevision;
+      const initialize = enabled => {
+        if (this.settingsRevision === initialSettingsRevision) this.configure(enabled);
+      };
+      this.unsubscribe = appearance?.subscribe(settings => this.configure(settings.relationshipBadges !== false));
+      if (typeof appearance?.load === "function") {
+        // Loading account data is opt-out. Wait for the persisted preference
+        // before sending the first request, and never overwrite a newer change.
+        try { Promise.resolve(appearance.load()).then(settings => initialize(settings?.relationshipBadges !== false), () => initialize(true)); }
+        catch { initialize(true); }
+      }
       this.refresh();
     }
     valid(card, entry) {
@@ -122,21 +137,28 @@
     }
     refresh() {
       if (this.disposed) return;
+      let added = false;
       for (const [card, entry] of this.entries) if (!this.valid(card, entry)) this.forget(card, entry);
       for (const card of this.sheet.querySelectorAll(".ss-person")) {
         const handle = profileHandle(card);
         if (!handle || this.entries.has(card)) continue;
         const entry = { handle, token: this.prefix + ":" + (++this.nextToken), visible: false, badge: null, signature: "" };
         this.entries.set(card, entry);
+        added = true;
         card.setAttribute("data-ss-relation-key", entry.token);
         this.intersections.observe(card);
       }
       if (this.enabled) for (const [card, entry] of this.entries) if (!entry.badge) this.render(card, entry, null);
-      this.queue();
+      this.queue(added);
     }
-    queue() {
-      if (this.disposed || !this.enabled || document.hidden || this.timer !== null || !this.entries.size) return;
-      this.timer = setTimeout(() => this.read(), Math.max(0, 1500 - (performance.now() - this.lastRead)));
+    queue(urgent = false) {
+      if (this.disposed || !this.enabled || document.hidden || !this.entries.size) return;
+      this.urgent ||= urgent;
+      if (this.pending || (this.timer !== null && !this.urgent)) return;
+      if (this.timer !== null) clearTimeout(this.timer);
+      const interval = this.urgent ? 180 : 1500;
+      this.urgent = false;
+      this.timer = setTimeout(() => this.read(), Math.max(0, interval - (performance.now() - this.lastRead)));
     }
     request(tokens) {
       return new Promise(resolve => {
@@ -154,10 +176,10 @@
       if (this.sheet.dataset.minimized === "true" || this.sheet.dataset.resizing === "true" || this.sheet.dataset.dragging === "true") {
         this.lastRead = performance.now(); this.queue(); return;
       }
-      this.lastRead = performance.now();
       const generation = this.generation;
       const active = [...this.entries].filter(([card, entry]) => entry.visible && this.valid(card, entry));
-      if (!active.length) { this.queue(); return; }
+      if (!active.length) return;
+      this.lastRead = performance.now();
       const data = await this.request(active.map(([, entry]) => entry.token));
       if (this.disposed || !this.enabled || generation !== this.generation) return;
       const people = new Map(), duplicate = new Set();
@@ -177,8 +199,10 @@
     }
     configure(enabled) {
       if (this.disposed) return;
+      this.settingsRevision++;
       if (this.enabled !== enabled) this.generation++;
       this.enabled = enabled;
+      if (this.sheet.getAttribute('data-ss-relation-enabled') !== String(enabled)) this.sheet.setAttribute('data-ss-relation-enabled', String(enabled));
       if (enabled) this.refresh();
       else {
         clearTimeout(this.timer); this.timer = null;
@@ -197,7 +221,10 @@
       this.observer.disconnect();
       for (const [card, entry] of this.entries) this.forget(card, entry);
       this.intersections.disconnect();
-      if (this.sheet.getAttribute("data-ss-relation-sheet") === this.prefix) this.sheet.removeAttribute("data-ss-relation-sheet");
+      if (this.sheet.getAttribute("data-ss-relation-sheet") === this.prefix) {
+        this.sheet.removeAttribute("data-ss-relation-sheet");
+        this.sheet.removeAttribute("data-ss-relation-enabled");
+      }
     }
   }
   globalThis.SpaceCastRelationships = Object.freeze({ create: (sheet, roomId) => new RelationshipBadges(sheet, roomId), describe });

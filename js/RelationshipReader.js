@@ -1,4 +1,4 @@
-/* Read-only access to relationships already loaded by X for the visible preview. */
+/* Read native room identities and load their relationships through X's own client. */
 (() => {
   "use strict";
   if (globalThis.SpaceCastRelationshipReader) return;
@@ -11,6 +11,9 @@
   const room = value => typeof value === "string" && /^[A-Za-z0-9]{1,64}$/.test(value) ? value : null;
   const unknown = () => Object.fromEntries(Object.keys(FIELDS).map(name => [name, null]));
   const excluded = '[data-ss-persistent],article,[data-testid="tweet"],[data-testid="tweetDetail"],[data-spacex-owned]';
+  const loader = globalThis.SpaceRelationshipLoader?.create({ onUpdate: () => {
+    window.postMessage({ source: "spacecast:relationships:updated" }, location.origin);
+  } });
 
   function chainFrom(first, committed) {
     const nodes = [], seen = new Set();
@@ -138,6 +141,30 @@
     return values;
   }
 
+  function currentParticipant(sheet, expectedRoom, card, token, person, store, viewer, freshlyRead = false) {
+    if (document.hidden || sheet.getAttribute('data-ss-relation-enabled') !== 'true' || sheet.dataset?.minimized === 'true' ||
+        !sheet.isConnected || !card.isConnected || card.closest(excluded) ||
+        card.closest('[data-testid="sheetDialog"]') !== sheet || card.getAttribute('data-ss-relation-key') !== token) return false;
+    const frame = sheet.getBoundingClientRect();
+    if (![...card.getClientRects()].some(bounds => bounds.width > 0 && bounds.height > 0 &&
+      bounds.right > Math.max(frame.left, 0) && bounds.bottom > Math.max(frame.top, 0) &&
+      bounds.left < Math.min(frame.right, window.innerWidth) && bounds.top < Math.min(frame.bottom, window.innerHeight))) return false;
+    // The synchronous caller just verified this native ancestry. Deferred
+    // requests and completions must prove it again after React can change it.
+    if (freshlyRead) return true;
+    const chain = ancestry(card, new Map()), current = identity(chain, expectedRoom);
+    if (!current || current.userId !== person.userId || current.screenName !== person.screenName) return false;
+    const values = contexts(chain, new Map()), viewers = new Set(), stores = new Set();
+    if (!values) return false;
+    for (const value of values) {
+      const id = userId(own(value, "viewerUserId"));
+      if (id) viewers.add(id);
+      const candidate = own(value, "store");
+      if (typeof own(candidate, "getState") === "function") stores.add(candidate);
+    }
+    return viewers.size === 1 && viewers.has(viewer) && stores.size === 1 && stores.has(store);
+  }
+
   function read(sheet, expectedRoom, requested) {
     const people = [], stores = new Map(), committed = new Map(), contextValues = new Map();
     try {
@@ -154,7 +181,7 @@
           if (!card?.isConnected || card.closest(excluded) || card.closest('[data-testid="sheetDialog"]') !== sheet) continue;
           const chain = ancestry(card, committed), person = identity(chain, expectedRoom);
           if (!person) continue;
-          const values = contexts(chain, contextValues), viewers = new Set(), samples = [];
+          const values = contexts(chain, contextValues), viewers = new Set(), nativeStores = new Set(), samples = [];
           let invalid = values === null;
           for (const value of values || []) {
             const viewer = userId(own(value, "viewerUserId"));
@@ -165,6 +192,7 @@
               try { stores.set(store, Reflect.apply(getState, store, [])); }
               catch { stores.set(store, null); }
             }
+            if (stores.get(store)) nativeStores.add(store);
             const user = own(own(own(own(stores.get(store), "entities"), "users"), "entities"), person.userId);
             if (user === undefined) continue;
             if (userId(own(user, "id_str")) !== person.userId || handle(own(user, "screen_name")) !== person.screenName) { invalid = true; continue; }
@@ -176,7 +204,21 @@
             const flagsFound = samples.map(sample => own(sample, input));
             flags[output] = flagsFound.every(value => typeof value === "boolean" && value === flagsFound[0]) ? flagsFound[0] : null;
           }
-          people.push({ token, ...person, self: !invalid && viewers.has(person.userId), ...flags });
+          const self = !invalid && viewers.has(person.userId);
+          const missing = Object.keys(FIELDS).filter(output => flags[output] === null && samples.every(sample => own(sample, FIELDS[output]) === undefined));
+          if (!invalid && !self && nativeStores.size === 1 && missing.length) {
+            const store = [...nativeStores][0], viewer = [...viewers][0];
+            let freshlyRead = true, loaded = null;
+            const isCurrent = () => currentParticipant(sheet, expectedRoom, card, token, person, store, viewer, freshlyRead);
+            try { loaded = loader?.get({ store, viewer, id: person.userId, handle: person.screenName, isCurrent }); }
+            finally { freshlyRead = false; }
+            if (loaded?.userId === person.userId && loaded.screenName === person.screenName) {
+              for (const output of missing) {
+                if (flags[output] === null && typeof loaded[output] === "boolean") flags[output] = loaded[output];
+              }
+            }
+          }
+          people.push({ token, ...person, self, ...flags });
         } catch { /* Recycled or unfamiliar native cards remain unknown. */ }
       }
     } catch { /* A closing native preview is not relationship evidence. */ }
