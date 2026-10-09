@@ -1398,6 +1398,7 @@ function mountPanel(panel, isPeek, windowState = {}) {
     const layout = new SpacePreviewLayout(sheet, panel.element);
     const { body, heading, closeButton: anchor } = layout;
     if (!body) { layout.dispose(); globalThis.SpaceCastPresentation?.release(sheet); return false; }
+    const relationships = globalThis.SpaceCastRelationships?.create(sheet, panel.space.id);
     const grip = document.createElement("button");
     grip.type = "button";
     grip.className = "ss-sheet-grip";
@@ -1464,11 +1465,13 @@ function mountPanel(panel, isPeek, windowState = {}) {
       glass.dispose();
       shell.dispose();
       grip.remove();
+      relationships?.dispose();
       layout.dispose();
     });
     panel.setShellRefresh(() => {
       const playing = panel.wantsPlayback();
       layout.refresh();
+      relationships?.refresh();
       // React can replace the toolbar as well as the footer. Rebind our shell
       // to the new native controls while keeping the same audio/cache session.
       if (layout.body !== body || layout.heading !== heading || layout.closeButton !== anchor) {

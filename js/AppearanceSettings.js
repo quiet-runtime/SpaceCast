@@ -3,7 +3,7 @@
   const key = "spacecast.appearance";
   const defaults = Object.freeze({
     style: "liquid", opacity: 45, blur: 16, refraction: 18,
-    participants: "comfortable", spectrum: true, reducedMotion: false,
+    participants: "comfortable", spectrum: true, reducedMotion: false, relationshipBadges: true,
   });
   const number = (value, fallback, min, max) => typeof value === "number" && Number.isFinite(value)
     ? Math.max(min, Math.min(max, Math.round(value))) : fallback;
@@ -18,6 +18,7 @@
       participants: ["compact", "comfortable", "large"].includes(input.participants) ? input.participants : defaults.participants,
       spectrum: typeof input.spectrum === "boolean" ? input.spectrum : defaults.spectrum,
       reducedMotion: typeof input.reducedMotion === "boolean" ? input.reducedMotion : defaults.reducedMotion,
+      relationshipBadges: input.relationshipBadges !== false,
     };
   }
 

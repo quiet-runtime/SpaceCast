@@ -28,6 +28,7 @@
     document.getElementById("participants").value = settings.participants;
     document.getElementById("spectrum").checked = settings.spectrum;
     document.getElementById("reducedMotion").checked = settings.reducedMotion;
+    document.getElementById("relationshipBadges").checked = settings.relationshipBadges;
     document.getElementById("opacity").disabled = settings.style === "solid";
     document.getElementById("blur").disabled = settings.style === "solid";
     document.getElementById("refraction").disabled = settings.style !== "liquid";
@@ -78,7 +79,7 @@
   }
   for (const radio of document.querySelectorAll('input[name="style"]')) radio.addEventListener("change", () => { if (radio.checked) update({ style: radio.value }, true); });
   document.getElementById("participants").addEventListener("change", event => update({ participants: event.target.value }, true));
-  for (const name of ["spectrum", "reducedMotion"]) document.getElementById(name).addEventListener("change", event => update({ [name]: event.target.checked }, true));
+  for (const name of ["spectrum", "reducedMotion", "relationshipBadges"]) document.getElementById(name).addEventListener("change", event => update({ [name]: event.target.checked }, true));
   document.getElementById("reset").addEventListener("click", () => update({ ...api.defaults }, true));
 
   const unsubscribe = api.subscribe(value => {
