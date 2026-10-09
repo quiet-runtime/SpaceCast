@@ -40,7 +40,7 @@ test('missing appearance uses complete defaults without modifying storage', asyn
   const { api, data } = setup();
   assert.deepEqual(plain(await api.load()), {
     style: 'liquid', opacity: 45, blur: 16, refraction: 18,
-    participants: 'comfortable', spectrum: true, reducedMotion: false,
+    participants: 'comfortable', spectrum: true, reducedMotion: false, relationshipBadges: true,
   });
   assert.equal(Object.isFrozen(api.defaults), true);
   assert.equal(Object.hasOwn(data, key), false);
@@ -49,7 +49,7 @@ test('missing appearance uses complete defaults without modifying storage', asyn
 test('normalization validates enums, strict booleans and finite bounded numbers', () => {
   const { api } = setup();
   const settings = plain(api.normalize({ style: 'script', opacity: 999, blur: -2, refraction: 18.6, participants: 'tiny', spectrum: 'false', reducedMotion: 1, extra: 'ignored' }));
-  assert.deepEqual(settings, { style: 'liquid', opacity: 90, blur: 0, refraction: 19, participants: 'comfortable', spectrum: true, reducedMotion: false });
+  assert.deepEqual(settings, { style: 'liquid', opacity: 90, blur: 0, refraction: 19, participants: 'comfortable', spectrum: true, reducedMotion: false, relationshipBadges: true });
   assert.deepEqual(plain(api.normalize({ opacity: NaN, blur: Infinity, refraction: '40' })), plain(api.defaults));
   for (const invalid of [null, [], 'invalid', false]) assert.deepEqual(plain(api.normalize(invalid)), plain(api.defaults));
 });
@@ -65,7 +65,7 @@ test('each supported style and participant size is preserved', () => {
 test('rapid partial writes merge in order instead of losing other controls', async () => {
   const { api, data } = setup();
   await Promise.all([api.save({ style: 'dracula' }), api.save({ opacity: 63 }), api.save({ participants: 'large' }), api.save({ spectrum: false })]);
-  assert.deepEqual(data[key], { style: 'dracula', opacity: 63, blur: 16, refraction: 18, participants: 'large', spectrum: false, reducedMotion: false });
+  assert.deepEqual(data[key], { style: 'dracula', opacity: 63, blur: 16, refraction: 18, participants: 'large', spectrum: false, reducedMotion: false, relationshipBadges: true });
   await api.save(api.defaults);
   assert.deepEqual(data[key], plain(api.defaults));
 });

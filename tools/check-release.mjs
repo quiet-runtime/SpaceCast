@@ -10,7 +10,7 @@ export function checkRelease(root) {
   if (pkg.license !== "MIT") throw new Error("Missing MIT package declaration");
   const references = [manifest.action.default_popup, manifest.options_ui.page,
     ...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon),
-    ...manifest.content_scripts.flatMap(entry => [...entry.js, ...entry.css]),
+    ...manifest.content_scripts.flatMap(entry => [...(entry.js || []), ...(entry.css || [])]),
     ...manifest.web_accessible_resources.flatMap(entry => entry.resources),
     "LICENSE", "README.md", "PRIVACY.md", "THIRD_PARTY_NOTICES.md", "licenses/Apache-2.0.txt", "js/hls.js/LICENCE"];
   function localFile(relative) {
