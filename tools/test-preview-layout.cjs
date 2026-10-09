@@ -211,3 +211,44 @@ test('an incomplete native tree clears stale anchors until X mounts its replacem
   assert.equal(state.layout.closeButton, null);
   assert.equal(state.layout.details, null);
 });
+
+test('anonymous listening keeps the same native action and footer through label changes', () => {
+  const state = fixture();
+  const handler = state.join.onclick = () => 'native';
+  const notice = state.footer.firstElementChild;
+  notice.append(el('a', { href: 'https://help.x.com/en/using-x/spaces' }, 'Learn more'));
+  const toggle = el('button', { role: 'switch', 'aria-label': 'Listen anonymously', 'aria-checked': 'true' });
+  const anonymous = el().append(el('span', {}, 'Listen anonymously'), toggle);
+  state.details.append(anonymous);
+  for (const label of ['Start listening anonymously', 'Start listening', 'Start listening anonymously']) {
+    state.join.text = label;
+    state.join.setAttribute('aria-label', label);
+    state.layout.refresh();
+    assert.equal(has(state.join, 'ss-native-listen'), true);
+    assert.equal(has(state.footer, 'ss-native-footer'), true);
+    assert.equal(has(notice, 'ss-notice'), true);
+    assert.equal(has(state.footer, 'ss-people-wrap'), false);
+    assert.equal(has(anonymous, 'ss-anonymous'), true);
+    assert.equal(has(toggle, 'ss-native-listen'), false);
+    assert.equal(toggle.getAttribute('aria-checked'), 'true');
+    assert.equal(state.join.onclick, handler);
+    mutations = 0;
+    state.layout.refresh();
+    assert.equal(mutations, 0);
+  }
+});
+
+test('anonymous role buttons preserve disabled and hidden state without broadening action matching', () => {
+  const state = fixture();
+  const join = el('div', { role: 'button', disabled: '', 'aria-disabled': 'true', hidden: '' }, 'Start listening anonymously');
+  state.details.replaceChildren(join);
+  state.layout.refresh();
+  assert.equal(has(join, 'ss-native-listen'), true);
+  assert.equal(has(join, 'ss-native-footer'), true);
+  for (const [name, value] of Object.entries({ disabled: '', 'aria-disabled': 'true', hidden: '' })) {
+    assert.equal(join.getAttribute(name), value);
+  }
+  for (const text of ['Listen anonymously', 'Stop listening anonymously', 'Start listening anonymously later', 'Leave']) {
+    assert.equal(context.Layout.isJoinControl(el('button', {}, text)), false);
+  }
+});
