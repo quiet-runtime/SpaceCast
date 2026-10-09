@@ -10,6 +10,12 @@
   },
   "content_scripts": [
     {
+      "js": ["js/RelationshipReader.js"],
+      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
       "js": ["js/SpacePresentation.js"],
       "css": ["css/transitions.css"],
       "matches": ["https://twitter.com/*", "https://x.com/*"],
@@ -30,6 +36,7 @@
         "js/GlassWindow.js",
         "js/SpaceSheet.js",
         "js/SpacePreviewLayout.js",
+        "js/RelationshipBadges.js",
         "js/SpaceDock.js",
         "js/SpaceCast.js"
       ],
@@ -65,5 +72,5 @@
     "storage"
   ],
   "name": "SpaceCast",
-  "version": "1.0.5"
+  "version": "1.0.6"
 }

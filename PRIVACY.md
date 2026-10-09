@@ -15,6 +15,7 @@ Existing X session cookies and request tokens are used locally to access X; Spac
 - **Rewind audio** is held in a session-specific IndexedDB database in X's site storage, or a bounded memory cache if that database is unavailable. The extension attempts to delete its session database when the session ends. An abrupt browser or system shutdown can leave temporary data until the site's storage is cleared.
 - **Recordings** are assembled locally and saved through the browser's download mechanism when you choose a recording action. File names and audio metadata can include the Space title, host, URL, and recording time. SpaceCast does not upload the resulting files.
 - **Participant snapshots** used while browsing remain in memory for the current session.
+- **Relationship labels** read the visible preview roster and account relationships already loaded in X's own page memory. They make no additional account or relationship requests, use no other extension or service, and are not saved. They are relative to your signed-in X account. Unknown data remains marked Unknown; the retained participant snapshot does not carry relationship labels after X removes its preview.
 
 Site storage belongs to the X origin; it is not an encrypted extension vault. Clearing X's site data removes the site-stored preferences and caches, but also affects X's own data and may sign you out. Remove downloaded recordings separately through your file manager. Browser controls manage the extension's own stored preferences.
 

@@ -28,6 +28,7 @@ SpaceCast gives X Spaces a movable, resizable player with continuous live rewind
 - **Local audio recording.** Save live Spaces and available replays as Ogg Opus, with a source-stream fallback when encoding is unavailable. Pause a live recording, save a part, or stop and save.
 - **One integrated window.** Move, resize, or minimize the Space without blocking the page behind it. Window position and size are remembered.
 - **Listening controls.** Ten-second skip buttons, volume, a 16-band equalizer, and an audio spectrum.
+- **Account relationships.** Clear labels below preview participants show mutual follows, Following, Follows you, blocks, mutes, and pending requests relative to your signed-in X account. Only X's already-loaded room data is used; missing facts stay Unknown. Turn labels off in Graphics & appearance.
 - **Four visual styles.** Liquid glass, Dracula, OLED, and Solid, with opacity, blur, refraction, participant-size, and reduced-motion settings.
 - **Optional video recording.** Capture the Space window on browsers that support reliable element or region capture. Codec availability depends on the browser and device.
 
